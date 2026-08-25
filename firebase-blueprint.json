@@ -1,0 +1,50 @@
+{
+  "entities": {
+    "Notification": {
+      "title": "Notification",
+      "description": "An application notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "isRead": { "type": "boolean" }
+      },
+      "required": ["message", "createdAt", "isRead"]
+    },
+    "Presence": {
+      "title": "Presence",
+      "description": "Live active user session presence tracker",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "avatar": { "type": "string" },
+        "role": { "type": "string" },
+        "email": { "type": "string" },
+        "currentPath": { "type": "string" },
+        "pageLabel": { "type": "string" },
+        "animeTitle": { "type": "string" },
+        "animeSlug": { "type": "string" },
+        "episodeNumber": { "type": "number" },
+        "poster": { "type": "string" },
+        "isWatching": { "type": "boolean" },
+        "userAgent": { "type": "string" },
+        "lastSeen": { "type": "number" },
+        "joinedAt": { "type": "number" }
+      },
+      "required": ["sessionId", "username", "lastSeen"]
+    }
+  },
+  "firestore": {
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "System-wide notifications"
+    },
+    "/presence/{sessionId}": {
+      "schema": "Presence",
+      "description": "Real-time user presence and active anime watch tracking"
+    }
+  }
+}

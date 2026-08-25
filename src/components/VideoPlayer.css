@@ -1,0 +1,68 @@
+.animem-player-shell {
+  --player-pink: #ff006a;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .11);
+  padding: 0;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #11111a, #06060a 55%, #0d0912);
+  box-shadow: 0 26px 75px rgba(0, 0, 0, .52), 0 0 32px rgba(255, 0, 106, .07);
+}
+
+.animem-player-shell::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0 0 auto;
+  height: 1px;
+  content: '';
+  background: linear-gradient(90deg, transparent, var(--player-pink), transparent);
+}
+
+.animem-player-footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(7, 7, 13, .88);
+}
+
+.animem-player-stage { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid rgba(255, 0, 106, .72); border-radius: 23px; background: radial-gradient(circle at 50% 30%, #25121f, #050506 68%); box-shadow: 0 0 0 1px rgba(255, 0, 106, .12), inset 0 0 50px rgba(255,0,106,.1), 0 0 32px rgba(255,0,106,.09); }
+.animem-player-instance, .animem-player-embed { width: 100%; height: 100%; border: 0; }
+.animem-player-instance > div, .animem-player-instance iframe { width: 100% !important; height: 100% !important; }
+
+.animem-player-footer { min-height: 34px; padding: 0 22px; color: rgba(255, 255, 255, .42); font-size: 10px; font-weight: 600; }
+
+.animem-player-error { position: absolute; inset: 0; display: flex; z-index: 3; align-items: center; justify-content: center; flex-direction: column; gap: 8px; padding: 24px; color: #fff; text-align: center; background: rgba(5, 5, 7, .94); }
+.animem-player-error strong { font-size: 15px; }
+.animem-player-error span { color: rgba(255, 255, 255, .62); font-size: 12px; }
+.animem-player-error button { margin-top: 6px; padding: 9px 16px; border: 0; border-radius: 8px; color: #fff; background: var(--player-pink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+.animem-episodes-panel {
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, .11);
+  border-radius: 20px;
+  background: linear-gradient(125deg, #11111b, #09090e);
+  box-shadow: inset 0 1px rgba(255,255,255,.025), 0 14px 35px rgba(0,0,0,.18);
+}
+html.light .animem-episodes-panel { background: #fff; border-color: rgba(15,23,42,.12); }
+
+/* PlayerJS renders its controls inside the player; the configured theme keeps its active controls pink. */
+.animem-player-instance .playerjs, .animem-player-instance [class*='player'] { font-family: "Outfit", Arial, sans-serif !important; }
+
+html.light .animem-player-shell { border-color: rgba(15, 23, 42, .13); box-shadow: 0 16px 40px rgba(15, 23, 42, .12); }
+html.light .animem-player-footer { background: #fff; color: #334155; }
+html.light .animem-player-footer { color: #64748b; }
+
+@media (max-width: 640px) {
+  .animem-player-shell { border-right: 0; border-left: 0; border-radius: 0; }
+  .animem-player-stage { border-radius: 0; border-right: 0; border-left: 0; }
+  .animem-player-footer { min-height: 30px; padding: 0 12px; font-size: 9px; }
+}
+
+/* Landscape phones: keep the player within the viewport height */
+@media (max-width: 940px) and (orientation: landscape) {
+  .animem-player-stage { max-height: 82vh; }
+}
