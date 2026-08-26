@@ -913,28 +913,35 @@ export default function Profil() {
                 className="bg-[#161618] border border-[#222] rounded-xl overflow-hidden group hover:border-[#ff006a]/50 transition-all flex flex-col relative"
               >
                 {/* Anime Poster */}
-                <Link to={`/anime/${toSlug(anime.title)}`} className="aspect-[3/4] relative overflow-hidden block bg-black">
-                  <img loading="lazy" decoding="async" 
-                    src={anime.image_url} 
-                    alt={anime.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {anime.rating && (
-                    <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-md border border-yellow-500/30 text-yellow-400 font-bold text-[10px] flex items-center gap-1">
-                      <Star size={10} className="fill-current" /> {Number(anime.rating).toFixed(1)}
-                    </div>
-                  )}
+                <Link to={`/anime/${toSlug(anime.title)}`} className="relative block p-[2px] rounded-xl bg-gradient-to-b from-white/20 via-white/5 to-[#ff006a]/25 group-hover:from-[#ff006a] group-hover:to-purple-600 transition-all duration-500">
+                  <div className="aspect-[3/4] relative overflow-hidden rounded-[10px] bg-black">
+                    <img loading="lazy" decoding="async" 
+                      src={anime.image_url} 
+                      alt={anime.title} 
+                      className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
+                    />
+                    <div className="absolute top-1.5 left-1.5 w-2 h-2 border-t-2 border-l-2 border-white/50 group-hover:border-[#ff006a] rounded-tl-sm pointer-events-none" />
+                    <div className="absolute top-1.5 right-1.5 w-2 h-2 border-t-2 border-r-2 border-white/50 group-hover:border-[#ff006a] rounded-tr-sm pointer-events-none" />
+                    <div className="absolute bottom-1.5 left-1.5 w-2 h-2 border-b-2 border-l-2 border-white/50 group-hover:border-[#ff006a] rounded-bl-sm pointer-events-none" />
+                    <div className="absolute bottom-1.5 right-1.5 w-2 h-2 border-b-2 border-r-2 border-white/50 group-hover:border-[#ff006a] rounded-br-sm pointer-events-none" />
+                    
+                    {anime.rating && (
+                      <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-md border border-yellow-500/30 text-yellow-400 font-bold text-[10px] flex items-center gap-1">
+                        <Star size={10} className="fill-current" /> {Number(anime.rating).toFixed(1)}
+                      </div>
+                    )}
 
-                  {/* Remove favorite quick button for owner */}
-                  {isOwner && (
-                    <button
-                      onClick={(e) => handleRemoveFavorite(e, anime.id)}
-                      title="Saqlanganlardan o'chirish"
-                      className="absolute top-2 left-2 bg-black/80 hover:bg-red-500 text-white/70 hover:text-white p-1.5 rounded-md border border-white/10 backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 z-10"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  )}
+                    {/* Remove favorite quick button for owner */}
+                    {isOwner && (
+                      <button
+                        onClick={(e) => handleRemoveFavorite(e, anime.id)}
+                        title="Saqlanganlardan o'chirish"
+                        className="absolute top-2 left-2 bg-black/80 hover:bg-red-500 text-white/70 hover:text-white p-1.5 rounded-md border border-white/10 backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 z-10"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
                 </Link>
 
                 {/* Anime Info */}

@@ -229,14 +229,21 @@ export default function Home() {
               <motion.div 
                 whileHover={{ scale: 1.03 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                className="w-56 lg:w-64 aspect-[3/4] rounded-lg overflow-hidden border border-white/10 shadow-[0_25px_60px_rgba(0,0,0,0.9)] bg-black"
+                className="w-56 lg:w-64 aspect-[3/4] rounded-2xl p-[2.5px] bg-gradient-to-b from-[#ff006a] via-purple-500/50 to-white/20 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_35px_rgba(255,0,106,0.35)]"
               >
-                <img loading="eager" fetchPriority="high" decoding="async" 
-                  src={featuredAnime.image_url} 
-                  alt={featuredAnime.title} 
-                  title={featuredAnime.title}
-                  className="w-full h-full object-cover" 
-                />
+                <div className="w-full h-full rounded-[13px] overflow-hidden bg-black relative">
+                  <img loading="eager" fetchPriority="high" decoding="async" 
+                    src={featuredAnime.image_url} 
+                    alt={featuredAnime.title} 
+                    title={featuredAnime.title}
+                    className="w-full h-full object-cover" 
+                  />
+                  {/* Cyber Corner Notches */}
+                  <div className="absolute top-2 left-2 w-3.5 h-3.5 border-t-2 border-l-2 border-[#ff006a] rounded-tl-sm pointer-events-none drop-shadow-[0_0_6px_rgba(255,0,106,0.8)]" />
+                  <div className="absolute top-2 right-2 w-3.5 h-3.5 border-t-2 border-r-2 border-[#ff006a] rounded-tr-sm pointer-events-none drop-shadow-[0_0_6px_rgba(255,0,106,0.8)]" />
+                  <div className="absolute bottom-2 left-2 w-3.5 h-3.5 border-b-2 border-l-2 border-[#ff006a] rounded-bl-sm pointer-events-none drop-shadow-[0_0_6px_rgba(255,0,106,0.8)]" />
+                  <div className="absolute bottom-2 right-2 w-3.5 h-3.5 border-b-2 border-r-2 border-[#ff006a] rounded-br-sm pointer-events-none drop-shadow-[0_0_6px_rgba(255,0,106,0.8)]" />
+                </div>
               </motion.div>
             </div>
           </div>

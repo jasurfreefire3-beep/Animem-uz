@@ -261,13 +261,19 @@ export default function Animelar() {
               transition={{ delay: (idx % 15) * 0.02 }}
               className="bg-[#111] border border-[#222] p-3 rounded-sm flex gap-4 hover:border-[#ff006a]/30 transition-colors group"
             >
-              <Link to={`/anime/${toSlug(anime.title)}`} title={anime.title} className="w-16 h-20 rounded-sm overflow-hidden bg-[#000] shrink-0 border border-[#222] relative block">
-                <img loading="lazy" decoding="async" 
-                  src={anime.image_url} 
-                  alt={anime.title} 
-                  title={anime.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
-                />
+              <Link to={`/anime/${toSlug(anime.title)}`} title={anime.title} className="w-18 sm:w-20 h-24 sm:h-28 shrink-0 block group/item">
+                <div className="w-full h-full p-[2px] rounded-xl bg-gradient-to-b from-white/20 via-white/5 to-[#ff006a]/30 group-hover/item:from-[#ff006a] group-hover/item:to-purple-600 transition-all duration-500 shadow-md">
+                  <div className="w-full h-full rounded-[10px] overflow-hidden bg-[#0c0c0e] relative">
+                    <img loading="lazy" decoding="async" 
+                      src={anime.image_url} 
+                      alt={anime.title} 
+                      title={anime.title}
+                      className="w-full h-full object-cover group-hover/item:scale-108 transition-transform duration-300" 
+                    />
+                    <div className="absolute top-1 left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/50 group-hover/item:border-[#ff006a] rounded-tl-sm pointer-events-none transition-colors" />
+                    <div className="absolute bottom-1 right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-white/50 group-hover/item:border-[#ff006a] rounded-br-sm pointer-events-none transition-colors" />
+                  </div>
+                </div>
               </Link>
 
               <div className="flex-1 min-w-0 flex flex-col justify-between">

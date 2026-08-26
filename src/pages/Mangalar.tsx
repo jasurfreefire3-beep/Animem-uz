@@ -166,9 +166,9 @@ export default function Mangalar() {
             <Link
               key={manga.id}
               to={`/manga/${manga.id}`}
-              className="group bg-[#111] border border-[#222] hover:border-[#ff006a]/50 rounded-lg overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#ff006a]/10 flex flex-col"
+              className="group relative p-[2px] rounded-xl bg-gradient-to-b from-white/20 via-white/5 to-[#ff006a]/25 hover:from-[#ff006a] hover:via-[#ff006a]/80 hover:to-purple-600 transition-all duration-500 shadow-md hover:shadow-[0_0_25px_rgba(255,0,106,0.4)] flex flex-col focus:outline-none"
             >
-              <div className="relative aspect-[3/4] overflow-hidden bg-[#18181c]">
+              <div className="relative aspect-[3/4] overflow-hidden rounded-[10px] bg-[#18181c]">
                 <img
                   src={manga.cover_url}
                   alt={manga.title}

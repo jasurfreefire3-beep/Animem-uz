@@ -120,13 +120,17 @@ export default function Tarix() {
             >
               <div className="flex items-center space-x-4 min-w-0 flex-1">
                 {/* Thumbnail */}
-                <Link to={`/anime/${toSlug(item.title)}`} title={item.title} className="w-12 h-16 bg-[#000] rounded-sm overflow-hidden border border-[#222] shrink-0 block">
-                  <img loading="lazy" decoding="async" 
-                    src={item.image_url} 
-                    alt={item.title} 
-                    title={item.title} 
-                    className="w-full h-full object-cover" 
-                  />
+                <Link to={`/anime/${toSlug(item.title)}`} title={item.title} className="w-14 h-18 shrink-0 block group/hist">
+                  <div className="w-full h-full p-[1.5px] rounded-xl bg-gradient-to-b from-white/20 via-white/5 to-[#ff006a]/30 group-hover/hist:from-[#ff006a] group-hover/hist:to-purple-600 transition-all duration-300 shadow-sm">
+                    <div className="w-full h-full rounded-[10px] overflow-hidden bg-[#0c0c0e] relative">
+                      <img loading="lazy" decoding="async" 
+                        src={item.image_url} 
+                        alt={item.title} 
+                        title={item.title} 
+                        className="w-full h-full object-cover group-hover/hist:scale-108 transition-transform" 
+                      />
+                    </div>
+                  </div>
                 </Link>
 
                 {/* Info */}

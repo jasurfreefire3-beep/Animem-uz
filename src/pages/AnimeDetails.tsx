@@ -636,8 +636,17 @@ export default function AnimeDetails() {
         <div className="relative w-full px-4 md:px-8 z-10 pb-4 md:pb-12">
           <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-start md:items-end max-w-7xl mx-auto">
              {/* Poster Overlay */}
-             <div className="hidden md:block w-32 sm:w-36 md:w-48 shrink-0 rounded-sm overflow-hidden shadow-2xl border border-white/10 transform translate-y-0 md:translate-y-16 hover:scale-105 transition-transform duration-300">
-               <img loading="lazy" decoding="async" src={anime.image_url} alt={anime.title} title={anime.title} className="w-full h-full object-cover aspect-[3/4]" />
+             <div className="hidden md:block w-36 sm:w-40 md:w-52 shrink-0 relative transform translate-y-0 md:translate-y-16 hover:scale-105 transition-all duration-300 group z-20">
+               <div className="relative p-[2.5px] rounded-2xl bg-gradient-to-b from-[#ff006a] via-purple-500/50 to-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_35px_rgba(255,0,106,0.35)]">
+                 <div className="aspect-[3/4] rounded-[13px] overflow-hidden bg-[#0c0c0e] relative">
+                   <img loading="lazy" decoding="async" src={anime.image_url} alt={anime.title} title={anime.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                   {/* Stylish Frame Corner Accents */}
+                   <div className="absolute top-2 left-2 w-3.5 h-3.5 border-t-2 border-l-2 border-[#ff006a] rounded-tl-sm pointer-events-none drop-shadow-[0_0_6px_rgba(255,0,106,0.8)]" />
+                   <div className="absolute top-2 right-2 w-3.5 h-3.5 border-t-2 border-r-2 border-[#ff006a] rounded-tr-sm pointer-events-none drop-shadow-[0_0_6px_rgba(255,0,106,0.8)]" />
+                   <div className="absolute bottom-2 left-2 w-3.5 h-3.5 border-b-2 border-l-2 border-[#ff006a] rounded-bl-sm pointer-events-none drop-shadow-[0_0_6px_rgba(255,0,106,0.8)]" />
+                   <div className="absolute bottom-2 right-2 w-3.5 h-3.5 border-b-2 border-r-2 border-[#ff006a] rounded-br-sm pointer-events-none drop-shadow-[0_0_6px_rgba(255,0,106,0.8)]" />
+                 </div>
+               </div>
              </div>
              
              {/* Title & Meta */}
@@ -1236,26 +1245,28 @@ export default function AnimeDetails() {
                    </h3>
                    <div className="space-y-3">
                      {similarAnimes.map(sim => (
-                       <Link 
-                         key={sim.id} 
-                         to={`/anime/${toSlug(sim.title)}`} 
-                         title={`${sim.title} - O'zbek tilida ko'rish`}
-                         className="flex gap-3 items-center group cursor-pointer p-1.5 rounded-sm hover:bg-[#222] transition-colors"
-                       >
-                         <div className="w-10 h-14 bg-[#222] rounded-sm overflow-hidden shrink-0">
-                           <img loading="lazy" decoding="async" 
-                             src={sim.image_url} 
-                             alt={`${sim.title} - O'zbek tilida ko'rish`} 
-                             title={`${sim.title} - O'zbek tilida ko'rish`}
-                             className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
-                           />
-                         </div>
-                         <div className="min-w-0 flex-1">
-                           <div className="text-white/90 text-xs font-medium line-clamp-1 group-hover:text-[#ff006a] transition-colors">{sim.title}</div>
-                           <div className="text-white/40 text-[10px] mt-0.5">TV Series • {sim.yil || "2026"}</div>
-                         </div>
-                       </Link>
-                     ))}
+                        <Link 
+                          key={sim.id} 
+                          to={`/anime/${toSlug(sim.title)}`} 
+                          title={`${sim.title} - O'zbek tilida ko'rish`}
+                          className="flex gap-3 items-center group cursor-pointer p-1.5 rounded-lg hover:bg-white/5 transition-all"
+                        >
+                          <div className="w-11 h-15 p-[1.5px] rounded-lg bg-gradient-to-b from-white/20 via-white/5 to-[#ff006a]/30 group-hover:from-[#ff006a] group-hover:to-purple-600 transition-all duration-300 shrink-0 shadow-sm">
+                            <div className="w-full h-full rounded-[6px] overflow-hidden bg-[#0c0c0e]">
+                              <img loading="lazy" decoding="async" 
+                                src={sim.image_url} 
+                                alt={`${sim.title} - O'zbek tilida ko'rish`} 
+                                title={`${sim.title} - O'zbek tilida ko'rish`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                              />
+                            </div>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-white/90 text-xs font-medium line-clamp-1 group-hover:text-[#ff006a] transition-colors">{sim.title}</div>
+                            <div className="text-white/40 text-[10px] mt-0.5">TV Series • {sim.yil || "2026"}</div>
+                          </div>
+                        </Link>
+                      ))}
                    </div>
                 </div>
               )}

@@ -74,15 +74,23 @@ export default function Top100() {
 
                 <div className="flex gap-4">
                   {/* Poster */}
-                  <Link to={`/anime/${toSlug(anime.title)}`} title={anime.title} className="w-20 h-28 bg-[#000] rounded-sm overflow-hidden border border-[#222] shrink-0 relative block">
-                    <img loading="lazy" decoding="async" 
-                      src={anime.image_url} 
-                      alt={anime.title} 
-                      title={anime.title} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                    />
-                    <div className={`absolute top-1 left-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black bg-black/80 border ${textColors[index]}`}>
-                      {rank}
+                  <Link to={`/anime/${toSlug(anime.title)}`} title={anime.title} className="w-20 h-28 shrink-0 relative block group/poster">
+                    <div className={`w-full h-full p-[2px] rounded-xl bg-gradient-to-b ${
+                      index === 0 ? 'from-[#ffd700] via-[#ffd700]/50 to-amber-900/40 shadow-[0_0_20px_rgba(255,215,0,0.3)]' :
+                      index === 1 ? 'from-[#e0e0e0] via-[#c0c0c0]/50 to-slate-800/40 shadow-[0_0_20px_rgba(192,192,192,0.3)]' :
+                      'from-[#cd7f32] via-[#cd7f32]/50 to-amber-950/40 shadow-[0_0_20px_rgba(205,127,50,0.3)]'
+                    } transition-all duration-300`}>
+                      <div className="w-full h-full rounded-[10px] overflow-hidden bg-black relative">
+                        <img loading="lazy" decoding="async" 
+                          src={anime.image_url} 
+                          alt={anime.title} 
+                          title={anime.title} 
+                          className="w-full h-full object-cover group-hover/poster:scale-108 transition-transform duration-300" 
+                        />
+                        <div className={`absolute top-1 left-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black bg-black/85 border ${textColors[index]} shadow-md`}>
+                          {rank}
+                        </div>
+                      </div>
                     </div>
                   </Link>
 
@@ -143,13 +151,17 @@ export default function Top100() {
                 </span>
 
                 {/* Thumbnail */}
-                <Link to={`/anime/${toSlug(anime.title)}`} title={anime.title} className="w-9 h-12 rounded-sm overflow-hidden border border-[#222] shrink-0 block">
-                  <img loading="lazy" decoding="async" 
-                    src={anime.image_url} 
-                    alt={anime.title} 
-                    title={anime.title} 
-                    className="w-full h-full object-cover" 
-                  />
+                <Link to={`/anime/${toSlug(anime.title)}`} title={anime.title} className="w-10 h-14 shrink-0 block group/thumb">
+                  <div className="w-full h-full p-[1.5px] rounded-lg bg-gradient-to-b from-white/20 via-white/5 to-[#ff006a]/30 group-hover/thumb:from-[#ff006a] group-hover/thumb:to-purple-600 transition-all duration-300 shadow-sm">
+                    <div className="w-full h-full rounded-[6px] overflow-hidden bg-[#0c0c0e]">
+                      <img loading="lazy" decoding="async" 
+                        src={anime.image_url} 
+                        alt={anime.title} 
+                        title={anime.title} 
+                        className="w-full h-full object-cover group-hover/thumb:scale-108 transition-transform" 
+                      />
+                    </div>
+                  </div>
                 </Link>
 
                 {/* Title */}
