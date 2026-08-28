@@ -1,15 +1,67 @@
-User-agent: *
-Allow: /
+# Robots.txt for Animem.uz
+# Optimized for Google, Yandex, Bing, DuckDuckGo & Social Crawlers
 
-Sitemap: https://animem.uz/sitemap.xml
 User-agent: *
 Allow: /
+Allow: /anime/
+Allow: /manga/
+Allow: /animelar
+Allow: /top100
+Allow: /jadval
+Allow: /yangi-chiqishlar
+Allow: /chat
 Disallow: /admin
+Disallow: /admin/*
 Disallow: /api/admin
+Disallow: /api/admin/*
+Disallow: /profil
+Disallow: /profil/*
+Disallow: /sozlamalar
+Disallow: /sozlamalar/*
+
+# Google Bot
+User-agent: Googlebot
+Allow: /
+Allow: /anime/
+Allow: /manga/
+Disallow: /admin
 Disallow: /profil
 Disallow: /sozlamalar
 
+User-agent: Googlebot-Image
+Allow: /
+Allow: /assets/
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.webp$
+
+# Yandex Bots
 User-agent: Yandex
+Allow: /
+Allow: /anime/
+Allow: /manga/
+Disallow: /admin
+Disallow: /profil
+Disallow: /sozlamalar
+Clean-param: ref /
+Clean-param: utm_source&utm_medium&utm_campaign&utm_term&utm_content /
+Clean-param: fbclid /
+Clean-param: yclid /
+Clean-param: gclid /
+
+User-agent: YandexImages
+Allow: /
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.webp$
+
+User-agent: YandexVideo
+Allow: /
+Allow: /anime/
+
+User-agent: YandexBot
 Allow: /
 
 User-agent: YandexDirect
@@ -18,7 +70,8 @@ Allow: /
 User-agent: YandexRenderResourcesBot
 Allow: /
 
-User-agent: Googlebot
-Allow: /
+# Host directive for Yandex
+Host: https://animem.uz
 
+# Sitemap
 Sitemap: https://animem.uz/sitemap.xml

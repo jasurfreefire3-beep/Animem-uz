@@ -1,6 +1,6 @@
 {
   "name": "ANIMEUZ",
-  "description": "Eng so'nggi va eng sara o'zbek tilidagi animelar katalogi, jadvali va tomosha qilish platformasi.",
+  "description": "Animem Uz - O'zbekistondagi eng yirik onlayn anime va manga platformasi. Eng so'nggi o'zbekcha tarjima animelarni HD sifatda bepul tomosha qiling.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

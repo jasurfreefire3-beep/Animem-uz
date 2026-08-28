@@ -6069,13 +6069,42 @@ async function start() {
   runTelegramBot();
   runSupportTelegramBot();
 
-  // Favicon handler ensuring /favicon.ico is served
+  // Explicit handlers for Favicon, Manifests, and Verification Files
   app.get("/favicon.ico", (req, res) => {
     const icoPath = path.join(publicPath, "favicon.ico");
     if (fs.existsSync(icoPath)) {
+      res.setHeader("Content-Type", "image/x-icon");
+      res.setHeader("Cache-Control", "public, max-age=86400");
       return res.sendFile(icoPath);
     }
     return res.sendFile(path.join(publicPath, "logo.png"));
+  });
+
+  app.get(["/site.webmanifest", "/manifest.json"], (req, res) => {
+    const manifestPath = path.join(publicPath, "site.webmanifest");
+    if (fs.existsSync(manifestPath)) {
+      res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+      return res.sendFile(manifestPath);
+    }
+    return res.json({ name: "Animem Uz", short_name: "Animem.uz", start_url: "/" });
+  });
+
+  app.get("/browserconfig.xml", (req, res) => {
+    const xmlPath = path.join(publicPath, "browserconfig.xml");
+    if (fs.existsSync(xmlPath)) {
+      res.setHeader("Content-Type", "application/xml; charset=utf-8");
+      return res.sendFile(xmlPath);
+    }
+    return res.status(404).send("Not found");
+  });
+
+  app.get("/yandex_a7133c70f3012b72.html", (req, res) => {
+    const yandexFile = path.join(publicPath, "yandex_a7133c70f3012b72.html");
+    if (fs.existsSync(yandexFile)) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.sendFile(yandexFile);
+    }
+    return res.type("text/html").send("<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"></head><body>verification: a7133c70f3012b72</body></html>");
   });
 
   app.get("/robots.txt", (req, res) => {
@@ -6106,13 +6135,14 @@ async function start() {
       .replace(/^-+|-+$/g, "");
   };
 
-  // Dynamic Sitemap XML generator
+  // Dynamic Sitemap XML generator (Optimized for Yandex & Google)
   app.get("/sitemap.xml", async (req, res) => {
     try {
       const domain = "https://animem.uz";
+      const todayIso = new Date().toISOString().split("T")[0];
       
       let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
       
       const staticPages = [
         { url: "/", priority: "1.0", freq: "daily" },
@@ -6129,12 +6159,12 @@ async function start() {
       ];
       
       for (const page of staticPages) {
-        xml += `  <url>\n    <loc>${domain}${page.url}</loc>\n    <changefreq>${page.freq}</changefreq>\n    <priority>${page.priority}</priority>\n  </url>\n`;
+        xml += `  <url>\n    <loc>${domain}${page.url}</loc>\n    <lastmod>${todayIso}</lastmod>\n    <changefreq>${page.freq}</changefreq>\n    <priority>${page.priority}</priority>\n  </url>\n`;
       }
       
       const genres = ["isekai", "sarguzasht", "fantasy", "jangari", "komediya", "dramatiya", "mecha", "romantika", "kriminal", "dahshat", "sport"];
       for (const g of genres) {
-        xml += `  <url>\n    <loc>${domain}/${g}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>\n`;
+        xml += `  <url>\n    <loc>${domain}/${g}</loc>\n    <lastmod>${todayIso}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>\n`;
       }
 
       // 1. Anime pages in Sitemap
@@ -6158,8 +6188,10 @@ async function start() {
         if (slug) {
           const imgUrl = (a.image_url || `${domain}/logo.png`).replace(/&/g, "&amp;");
           const titleClean = (a.title || "Anime").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const animeDate = a.updated_at ? new Date(a.updated_at).toISOString().split("T")[0] : todayIso;
           xml += `  <url>\n`;
           xml += `    <loc>${domain}/anime/${slug}</loc>\n`;
+          xml += `    <lastmod>${animeDate}</lastmod>\n`;
           xml += `    <image:image>\n`;
           xml += `      <image:loc>${imgUrl}</image:loc>\n`;
           xml += `      <image:title>${titleClean}</image:title>\n`;
@@ -6191,8 +6223,10 @@ async function start() {
         if (m.id) {
           const coverUrl = (m.cover_url || `${domain}/logo.png`).replace(/&/g, "&amp;");
           const mTitleClean = (m.title || "Manga").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const mangaDate = m.updated_at ? new Date(m.updated_at).toISOString().split("T")[0] : todayIso;
           xml += `  <url>\n`;
           xml += `    <loc>${domain}/manga/${m.id}</loc>\n`;
+          xml += `    <lastmod>${mangaDate}</lastmod>\n`;
           xml += `    <image:image>\n`;
           xml += `      <image:loc>${coverUrl}</image:loc>\n`;
           xml += `      <image:title>${mTitleClean}</image:title>\n`;
