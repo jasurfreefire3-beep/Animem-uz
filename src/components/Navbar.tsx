@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Notification, Anime, toSlug } from '../types';
-import { Search, LogOut, User, Bell, Menu, PlusCircle, Heart, Settings, X, Shield, Star, Film, Sparkles, Check } from 'lucide-react';
+import { Search, LogOut, User, Bell, Menu, PlusCircle, Heart, Bookmark, Settings, X, Shield, Star, Film, Sparkles, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   getNotificationPermission, 
@@ -467,6 +467,14 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                     >
                       <User size={13} />
                       <span>Mening profilim</span>
+                    </Link>
+                    <Link
+                      to="/shaxsiy-royxat"
+                      onClick={() => setShowProfileDropdown(false)}
+                      className="flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white hover:bg-[#1a1a1c] rounded-sm transition-colors"
+                    >
+                      <Bookmark size={13} className="text-[#ff006a]" />
+                      <span>Shaxsiy Ro'yxat</span>
                     </Link>
                     <Link
                       to="/sevimlilar"

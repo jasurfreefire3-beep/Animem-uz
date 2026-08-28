@@ -120,6 +120,37 @@ export interface Message {
   created_at: string;
 }
 
+export type UserListStatus = 'watching' | 'plan_to_watch' | 'completed' | 'dropped' | 'favorite';
+
+export interface UserListItem {
+  animeId: string | number;
+  status: UserListStatus;
+  updatedAt: string;
+  watchedEpisodes?: number;
+  rating?: number;
+  anime?: Partial<Anime>;
+}
+
+export interface EpisodeProgress {
+  episodeNumber: number;
+  watched: boolean;
+  timestamp?: number;
+  duration?: number;
+  progressPercent?: number;
+  lastWatchedAt: string;
+}
+
+export interface AnimeWatchProgress {
+  animeId: string | number;
+  animeTitle: string;
+  animeSlug: string;
+  poster: string;
+  lastEpisode: number;
+  totalEpisodes: number;
+  episodes: Record<number, EpisodeProgress>;
+  updatedAt: string;
+}
+
 export const GENRE_MAP: Record<string, string> = {
   'Action': 'Jangari',
   'Adventure': 'Sarguzasht',

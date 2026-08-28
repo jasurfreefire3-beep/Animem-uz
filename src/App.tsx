@@ -29,6 +29,7 @@ const Jadval = lazy(() => import('./pages/Jadval'));
 const YangiChiqishlar = lazy(() => import('./pages/YangiChiqishlar'));
 const Top100 = lazy(() => import('./pages/Top100'));
 const Sevimlilar = lazy(() => import('./pages/Sevimlilar'));
+const ShaxsiyRoyxat = lazy(() => import('./pages/ShaxsiyRoyxat'));
 const Tarix = lazy(() => import('./pages/Tarix'));
 const Sozlamalar = lazy(() => import('./pages/Sozlamalar'));
 const Profil = lazy(() => import('./pages/Profil'));
@@ -225,6 +226,8 @@ export default function App() {
               <Route path="/yangi-chiqishlar" element={<YangiChiqishlar />} />
               <Route path="/top100" element={<Top100 />} />
               <Route path="/sevimlilar" element={<Sevimlilar />} />
+              <Route path="/shaxsiy-royxat" element={<ShaxsiyRoyxat />} />
+              <Route path="/my-list" element={<Navigate to="/shaxsiy-royxat" replace />} />
               <Route path="/tarix" element={<Tarix />} />
               <Route path="/sozlamalar" element={<Sozlamalar />} />
               <Route path="/profil" element={<Profil />} />

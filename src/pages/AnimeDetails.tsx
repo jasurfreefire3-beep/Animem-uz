@@ -8,7 +8,13 @@ import VideoPlayer from '../components/VideoPlayer';
 import AgeGate from '../components/AgeGate';
 import AdBanner728x90 from '../components/AdBanner728x90';
 import NativeBannerAd from '../components/NativeBannerAd';
+import PersonalListButton from '../components/PersonalListButton';
 import { setActiveAnimeViewing } from '../hooks/usePresenceTracker';
+import { 
+  getAnimeWatchProgress, 
+  getWatchedEpisodesMap, 
+  recordEpisodeWatch 
+} from '../services/watchProgressService';
 
 export default function AnimeDetails() {
   const params = useParams();
@@ -21,6 +27,8 @@ export default function AnimeDetails() {
   const [episodesList, setEpisodesList] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [activeEpisode, setActiveEpisode] = useState(1);
+  const [watchedEpisodes, setWatchedEpisodes] = useState<Record<number, boolean>>({});
+  const [lastWatchedEp, setLastWatchedEp] = useState<number | null>(null);
   const [currentVideoUrl, setCurrentVideoUrl] = useState('');
   const [isFavorited, setIsFavorited] = useState(false);
   const [lightsOff, setLightsOff] = useState(false);
@@ -67,6 +75,16 @@ export default function AnimeDetails() {
         console.log("Fetched anime:", data);
         setAnime(data);
         fetchRatingSummary(data.id);
+
+        // Load watch progress & watched episodes
+        const progress = getAnimeWatchProgress(data.id);
+        const watchedMap = getWatchedEpisodesMap(data.id);
+        setWatchedEpisodes(watchedMap);
+        if (progress && progress.lastEpisode) {
+          setLastWatchedEp(progress.lastEpisode);
+          setActiveEpisode(progress.lastEpisode);
+        }
+
         if (data.video_url) {
           setCurrentVideoUrl(data.video_url);
         }
@@ -547,6 +565,10 @@ export default function AnimeDetails() {
 
   const handleEpisodeClick = (ep: any) => {
     setActiveEpisode(ep.number);
+    setWatchedEpisodes(prev => ({ ...prev, [ep.number]: true }));
+    if (anime) {
+      recordEpisodeWatch(anime, ep.number, { token });
+    }
     if (ep.video_url) {
       setCurrentVideoUrl(ep.video_url);
     } else {
@@ -708,7 +730,7 @@ export default function AnimeDetails() {
                     <span className="text-white/40 text-[10px] ml-2">({anime.rating_count || 0} baho)</span>
                 </div>
 
-                <div className="flex flex-row gap-2 md:gap-3 w-full mt-2 md:mt-0">
+                <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full mt-2 md:mt-0">
                   <button 
                     onClick={() => {
                       const playerSec = document.getElementById('player-section');
@@ -716,20 +738,38 @@ export default function AnimeDetails() {
                         playerSec.scrollIntoView({ behavior: 'smooth' });
                       }
                     }}
-                    className="flex-1 md:flex-none bg-[#ff006a] hover:bg-[#d40058] text-white px-4 md:px-8 py-3 rounded-sm font-black flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-[#ff006a]/25 text-[11px] md:text-sm uppercase tracking-wider"
+                    className="flex-1 min-w-[140px] md:flex-none bg-[#ff006a] hover:bg-[#d40058] text-white px-4 md:px-8 py-3 rounded-sm font-black flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-[#ff006a]/25 text-[11px] md:text-sm uppercase tracking-wider"
                   >
-                    <Play className="w-4 h-4 fill-current shrink-0" /> <span className="hidden min-[400px]:inline">TOMOSHA QILISH</span><span className="inline min-[400px]:hidden">TOMOSHA</span>
+                    <Play className="w-4 h-4 fill-current shrink-0" /> 
+                    <span>TOMOSHA QILISH</span>
                   </button>
+
+                  {lastWatchedEp && lastWatchedEp > 1 && (
+                    <button 
+                      onClick={() => {
+                        const targetEp = combinedEpisodes.find(e => e.number === lastWatchedEp) || { number: lastWatchedEp };
+                        handleEpisodeClick(targetEp);
+                      }}
+                      className="flex-1 min-w-[170px] md:flex-none bg-gradient-to-r from-purple-600 to-[#ff006a] hover:opacity-90 text-white px-4 md:px-6 py-3 rounded-sm font-black flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-purple-600/25 text-[11px] md:text-sm uppercase tracking-wider"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current shrink-0" /> 
+                      <span>{lastWatchedEp}-QISMDAN DAVOM</span>
+                    </button>
+                  )}
+
+                  {/* Personal List Status Dropdown */}
+                  <PersonalListButton anime={anime} className="flex-1 min-w-[150px] md:flex-none" />
+
                   <button 
                     onClick={toggleFavorite}
-                    className={`flex-1 md:flex-none px-4 md:px-8 py-3 rounded-sm font-black transition-all flex items-center justify-center gap-2 text-[11px] md:text-sm border uppercase tracking-wider ${
+                    className={`flex-1 min-w-[130px] md:flex-none px-4 md:px-6 py-3 rounded-sm font-black transition-all flex items-center justify-center gap-2 text-[11px] md:text-sm border uppercase tracking-wider ${
                       isFavorited 
                         ? 'bg-[#ff006a]/15 border-[#ff006a] text-white shadow-[0_0_15px_rgba(255,0,106,0.25)]' 
                         : 'bg-[#18181b] border-[#27272a] hover:bg-[#27272a] text-white'
                     }`}
                   >
                     <Heart className={`w-4 h-4 shrink-0 ${isFavorited ? 'fill-current text-[#ff006a]' : ''}`} /> 
-                    <span className="hidden min-[400px]:inline">{isFavorited ? 'SEVIMLILARDA' : 'SEVIMLILARGA QO\'SHISH'}</span>
+                    <span className="hidden min-[400px]:inline">{isFavorited ? 'SEVIMLILARDA' : 'SEVIMLILAR'}</span>
                     <span className="inline min-[400px]:hidden">{isFavorited ? 'SAQLANDI' : 'SAQLASH'}</span>
                   </button>
                 </div>
@@ -840,9 +880,16 @@ export default function AnimeDetails() {
                     <h3 className="text-xs font-bold text-[#ff9ac5] uppercase tracking-widest flex items-center gap-2">
                        <ListOrdered className="w-3.5 h-3.5" /> Qismlar
                     </h3>
-                    <span className="text-[11px] font-mono text-white/40">
-                      Jami: {combinedEpisodes.length} ta qism
-                    </span>
+                    <div className="flex items-center gap-2 text-[11px] font-mono">
+                      <span className="text-white/40">
+                        Jami: {combinedEpisodes.length} ta
+                      </span>
+                      {Object.keys(watchedEpisodes).length > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-[#10b981]/15 border border-[#10b981]/30 text-[#10b981] font-bold text-[10px]">
+                          Ko'rildi: {Object.keys(watchedEpisodes).length} ta
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="max-h-[195px] md:max-h-[230px] overflow-y-auto pr-1.5 custom-scrollbar p-1">
                     <div className="flex flex-wrap gap-2.5 sm:gap-3">
@@ -850,7 +897,7 @@ export default function AnimeDetails() {
                           <button 
                              key={ep.number}
                              onClick={() => handleEpisodeClick(ep)}
-                             className={`w-12 h-11 sm:w-14 sm:h-12 rounded-xl text-sm font-semibold transition-all flex items-center justify-center border shrink-0 ${
+                             className={`relative w-12 h-11 sm:w-14 sm:h-12 rounded-xl text-sm font-semibold transition-all flex items-center justify-center border shrink-0 ${
                                 activeEpisode === ep.number 
                                    ? 'bg-[#1b0b16] border-[#ff006a] text-white shadow-[0_0_18px_rgba(255,0,106,0.42)]'
                                 : ep.video_url
@@ -858,6 +905,13 @@ export default function AnimeDetails() {
                                       : 'bg-[#09090b] text-white/10 border border-[#1a1a1a] cursor-not-allowed'
                              }`}
                           >
+                             {/* Watched indicator dot */}
+                             {watchedEpisodes[ep.number] && (
+                               <span 
+                                 className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981] ring-1 ring-black/80" 
+                                 title={`${ep.number}-qism ko'rilgan`}
+                               />
+                             )}
                              {ep.number}
                           </button>
                        ))}
