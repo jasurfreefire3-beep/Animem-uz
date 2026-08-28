@@ -98,32 +98,27 @@ export default function AnimeDetails() {
           }
         }
 
-        // Fetch episodes
-        const epRes = await fetch(`${API_BASE}/api/animes/${data.id}/episodes`);
-        const epType = epRes.headers.get("content-type");
-        if (epRes.ok && epType && epType.includes("application/json")) {
-          const eps = await epRes.json();
-          setEpisodesList(eps);
-          const ep1 = eps.find((e: any) => e.episode_number === 1);
+        // Concurrent parallel fetching of anime sub-resources (episodes, comments, similar animes, ratings)
+        const [epRes, commRes, listRes] = await Promise.allSettled([
+          fetch(`${API_BASE}/api/animes/${data.id}/episodes`).then(r => r.ok ? r.json() : []),
+          fetch(`${API_BASE}/api/animes/${data.id}/comments`).then(r => r.ok ? r.json() : []),
+          fetch(`${API_BASE}/api/animes`).then(r => r.ok ? r.json() : [])
+        ]);
+
+        if (epRes.status === 'fulfilled' && Array.isArray(epRes.value)) {
+          setEpisodesList(epRes.value);
+          const ep1 = epRes.value.find((e: any) => e.episode_number === 1);
           if (ep1 && ep1.video_url) {
             setCurrentVideoUrl(ep1.video_url);
           }
         }
 
-        // Fetch comments
-        const commRes = await fetch(`${API_BASE}/api/animes/${data.id}/comments`);
-        const commType = commRes.headers.get("content-type");
-        if (commRes.ok && commType && commType.includes("application/json")) {
-          const coms = await commRes.json();
-          setComments(coms);
+        if (commRes.status === 'fulfilled' && Array.isArray(commRes.value)) {
+          setComments(commRes.value);
         }
 
-        // Fetch similar animelar for sidebar
-        const listRes = await fetch(`${API_BASE}/api/animes`);
-        const listType = listRes.headers.get("content-type");
-        if (listRes.ok && listType && listType.includes("application/json")) {
-          const listData = await listRes.json();
-          const filtered = listData.filter((item: Anime) => String(item.id) !== String(data.id));
+        if (listRes.status === 'fulfilled' && Array.isArray(listRes.value)) {
+          const filtered = listRes.value.filter((item: Anime) => String(item.id) !== String(data.id));
           setSimilarAnimes(filtered.slice(0, 5));
         }
       } catch (err) {

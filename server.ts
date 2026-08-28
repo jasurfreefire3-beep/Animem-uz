@@ -13,6 +13,7 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import { GoogleGenAI } from "@google/genai";
+import compression from "compression";
 
 dotenv.config();
 
@@ -20,6 +21,9 @@ const upload = multer({ dest: "/tmp/" });
 
 const app = express();
 app.set("trust proxy", true);
+app.use(compression({
+  threshold: 512, // Compress anything larger than 512 bytes
+}));
 app.use(cors());
 
 // Proxy Firebase Auth helper routes (/__/*) to Firebase's default auth handler
@@ -138,7 +142,46 @@ async function dbQuery<T = any>(sql: string, params?: any[], retries = 3): Promi
 
 const LOCAL_STORE_PATH = path.join(process.cwd(), "local_store.json");
 
+// In-Memory Global Server Cache (Instant sub-millisecond response)
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+const serverCache = new Map<string, CacheEntry<any>>();
+
+function getCache<T>(key: string, maxAgeMs = 20000): T | null {
+  const item = serverCache.get(key);
+  if (!item) return null;
+  if (Date.now() - item.timestamp > maxAgeMs) {
+    serverCache.delete(key);
+    return null;
+  }
+  return item.data;
+}
+
+function setCache<T>(key: string, data: T): void {
+  serverCache.set(key, { data, timestamp: Date.now() });
+}
+
+function invalidateServerCache(pattern?: string): void {
+  if (!pattern) {
+    serverCache.clear();
+    return;
+  }
+  for (const k of Array.from(serverCache.keys())) {
+    if (k.includes(pattern)) {
+      serverCache.delete(k);
+    }
+  }
+}
+
+let memoryLocalStore: any = null;
+let saveStoreTimeout: any = null;
+
 function loadLocalStore() {
+  if (memoryLocalStore) {
+    return memoryLocalStore;
+  }
   try {
     if (!fs.existsSync(LOCAL_STORE_PATH)) {
       const defaultData = {
@@ -215,20 +258,15 @@ function loadLocalStore() {
         donations: []
       };
       fs.writeFileSync(LOCAL_STORE_PATH, JSON.stringify(defaultData, null, 2), "utf-8");
-      return defaultData;
+      memoryLocalStore = defaultData;
+      return memoryLocalStore;
     }
     const raw = fs.readFileSync(LOCAL_STORE_PATH, "utf-8");
-    const data = JSON.parse(raw);
-    if (!data.mangas) {
-      data.mangas = [];
-    }
-    if (!data.manga_chapters) {
-      data.manga_chapters = [];
-    }
-    if (!data.donations) {
-      data.donations = [];
-    }
-    return data;
+    memoryLocalStore = JSON.parse(raw);
+    if (!memoryLocalStore.mangas) memoryLocalStore.mangas = [];
+    if (!memoryLocalStore.manga_chapters) memoryLocalStore.manga_chapters = [];
+    if (!memoryLocalStore.donations) memoryLocalStore.donations = [];
+    return memoryLocalStore;
   } catch (e) {
     console.error("Error loading local_store.json:", e);
     return { animes: [], notifications: [], comments: [], episodes: [], users: [], ratings: [], messages: [] };
@@ -236,11 +274,13 @@ function loadLocalStore() {
 }
 
 function saveLocalStore(data: any) {
-  try {
-    fs.writeFileSync(LOCAL_STORE_PATH, JSON.stringify(data, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Error saving local_store.json:", e);
-  }
+  memoryLocalStore = data;
+  if (saveStoreTimeout) clearTimeout(saveStoreTimeout);
+  saveStoreTimeout = setTimeout(() => {
+    fs.promises.writeFile(LOCAL_STORE_PATH, JSON.stringify(data, null, 2), "utf-8").catch((err) => {
+      console.error("Error async saving local_store.json:", err);
+    });
+  }, 1000);
 }
 
 const server = http.createServer(app);
@@ -2397,19 +2437,29 @@ async function getRatingsFromFile(): Promise<RatingRecord[]> {
       }
       
       await fs.promises.writeFile(DATA_FILE_PATH, JSON.stringify({ ratings: initialRatings }, null, 2));
+      cachedRatings = initialRatings;
+      ratingsCacheTime = Date.now();
       return initialRatings;
     }
     const content = await fs.promises.readFile(DATA_FILE_PATH, "utf-8");
     const data = JSON.parse(content);
-    return data.ratings || [];
+    cachedRatings = data.ratings || [];
+    ratingsCacheTime = Date.now();
+    return cachedRatings;
   } catch (error) {
     console.error("Error reading ratings from data.json:", error);
-    return [];
+    return cachedRatings || [];
   }
 }
 
+let cachedRatings: RatingRecord[] | null = null;
+let ratingsCacheTime = 0;
+
 async function saveRatingsToFile(ratings: RatingRecord[]): Promise<boolean> {
   try {
+    cachedRatings = ratings;
+    ratingsCacheTime = Date.now();
+    invalidateServerCache("api_all_animes");
     await fs.promises.writeFile(DATA_FILE_PATH, JSON.stringify({ ratings }, null, 2));
     return true;
   } catch (error) {
@@ -2453,6 +2503,11 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/animes", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=60");
+  const cached = getCache<any[]>("api_all_animes", 20000);
+  if (cached) {
+    return res.json(cached);
+  }
   try {
     const [rows]: any = await dbQuery("SELECT * FROM animes ORDER BY id DESC");
     if (Array.isArray(rows) && rows.length > 0) {
@@ -2460,6 +2515,7 @@ app.get("/api/animes", async (req, res) => {
       store.animes = rows;
       saveLocalStore(store);
       const merged = await mergeRatingsWithAnimes(rows);
+      setCache("api_all_animes", merged);
       return res.json(merged);
     }
   } catch (err) {
@@ -2467,18 +2523,27 @@ app.get("/api/animes", async (req, res) => {
   }
   const store = loadLocalStore();
   const merged = await mergeRatingsWithAnimes(store.animes || []);
+  setCache("api_all_animes", merged);
   res.json(merged);
 });
 
 // Get single anime
 app.get("/api/animes/:id", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
   const id = req.params.id;
+  const cacheKey = `api_anime_${id}`;
+  const cached = getCache<any>(cacheKey, 15000);
+  if (cached) {
+    dbQuery("UPDATE animes SET korishlar = korishlar + 1 WHERE id = ?", [id]).catch(() => {});
+    return res.json(cached);
+  }
   try {
     const [rows]: any = await dbQuery("SELECT * FROM animes WHERE id = ?", [id]);
     if (rows && rows.length > 0) {
       dbQuery("UPDATE animes SET korishlar = korishlar + 1 WHERE id = ?", [id]).catch(() => {});
       rows[0].korishlar = (rows[0].korishlar || 0) + 1;
       const merged = await mergeRatingsWithAnimes(rows);
+      setCache(cacheKey, merged[0]);
       return res.json(merged[0]);
     }
   } catch (err) {
@@ -2493,12 +2558,21 @@ app.get("/api/animes/:id", async (req, res) => {
   anime.korishlar = (anime.korishlar || 0) + 1;
   saveLocalStore(store);
   const merged = await mergeRatingsWithAnimes([anime]);
+  setCache(cacheKey, merged[0]);
   res.json(merged[0]);
 });
 
 // Get single anime by slug
 app.get("/api/animes/by-slug/:slug", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
   const slug = req.params.slug;
+  const cacheKey = `api_anime_slug_${slug}`;
+  const cached = getCache<any>(cacheKey, 15000);
+  if (cached) {
+    dbQuery("UPDATE animes SET korishlar = korishlar + 1 WHERE id = ?", [cached.id]).catch(() => {});
+    return res.json(cached);
+  }
+
   const toSlugLocal = (text: string): string => {
     if (!text) return "";
     return text
@@ -2517,6 +2591,7 @@ app.get("/api/animes/by-slug/:slug", async (req, res) => {
         dbQuery("UPDATE animes SET korishlar = korishlar + 1 WHERE id = ?", [anime.id]).catch(() => {});
         anime.korishlar = (anime.korishlar || 0) + 1;
         const merged = await mergeRatingsWithAnimes([anime]);
+        setCache(cacheKey, merged[0]);
         return res.json(merged[0]);
       }
     }
@@ -3593,6 +3668,11 @@ app.delete("/api/animes/:animeId/episodes/:episodeNumber", authenticateToken, as
 
 // GET All Mangas
 app.get("/api/mangas", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=60");
+  const cached = getCache<any[]>("api_all_mangas", 20000);
+  if (cached) {
+    return res.json(cached);
+  }
   try {
     let mangas: any[] = [];
     try {
@@ -3608,6 +3688,7 @@ app.get("/api/mangas", async (req, res) => {
       const store = loadLocalStore();
       mangas = store.mangas || [];
     }
+    setCache("api_all_mangas", mangas);
     res.json(mangas);
   } catch (err) {
     console.error("Get mangas error:", err);
@@ -3617,8 +3698,15 @@ app.get("/api/mangas", async (req, res) => {
 
 // GET Single Manga Details with Chapters
 app.get("/api/mangas/:id", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
+  const id = req.params.id;
+  const cacheKey = `api_manga_${id}`;
+  const cached = getCache<any>(cacheKey, 15000);
+  if (cached) {
+    dbQuery(`UPDATE mangas SET korishlar = korishlar + 1 WHERE id = ?`, [id]).catch(() => {});
+    return res.json(cached);
+  }
   try {
-    const id = req.params.id;
     let manga: any = null;
     let chapters: any[] = [];
 

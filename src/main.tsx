@@ -18,6 +18,15 @@ try {
   console.warn("Storage not accessible for theme check:", e);
 }
 
+// PWA Service Worker registration
+if ('serviceWorker' in navigator && typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.log('SW registration notice:', err);
+    });
+  });
+}
+
 const rootElement = document.getElementById('root');
 if (rootElement) {
   createRoot(rootElement).render(

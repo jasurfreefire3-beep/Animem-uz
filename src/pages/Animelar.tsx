@@ -21,8 +21,21 @@ export default function Animelar() {
   const genreFilter = searchParams.get('genre') || '';
   const searchFilter = searchParams.get('search') || '';
 
-  const [animes, setAnimes] = useState<Anime[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [animes, setAnimes] = useState<Anime[]>(() => {
+    try {
+      const cached = sessionStorage.getItem('cached_home_animes');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !sessionStorage.getItem('cached_home_animes');
+    } catch {
+      return true;
+    }
+  });
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [localSearch, setLocalSearch] = useState(searchFilter);
   const [visibleCount, setVisibleCount] = useState<number>(getBatchSize);
@@ -47,6 +60,7 @@ export default function Animelar() {
   }, [genreFilter, searchFilter]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchAnimes = async () => {
       try {
         const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
@@ -54,15 +68,21 @@ export default function Animelar() {
         const contentType = res.headers.get("content-type");
         if (res.ok && contentType && contentType.includes("application/json")) {
           const data = await res.json();
-          setAnimes(data);
+          if (isMounted) {
+            setAnimes(data);
+            try {
+              sessionStorage.setItem('cached_home_animes', JSON.stringify(data));
+            } catch {}
+          }
         }
-        setLoading(false);
+        if (isMounted) setLoading(false);
       } catch (err) {
         console.error("Error fetching animes:", err);
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     fetchAnimes();
+    return () => { isMounted = false; };
   }, []);
 
   const genres = [

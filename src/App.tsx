@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import ChatWidget from './components/ChatWidget';
 import SpinBetterAdModal from './components/SpinBetterAdModal';
 import NotificationPromptModal from './components/NotificationPromptModal';
+import InstallAppButton from './components/InstallAppButton';
 import { Send, X, Instagram } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Footer from './components/Footer';
@@ -41,12 +42,16 @@ const Aloqa = lazy(() => import('./pages/Aloqa'));
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center min-h-[50vh] w-full">
-      <img 
-        src="https://kitsunee.moe/loader.gif" 
-        alt="Yuklanmoqda..." 
-        className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-[0_0_15px_rgba(255,0,106,0.25)]" 
-      />
+    <div className="flex flex-col items-center justify-center min-h-[50vh] w-full gap-3">
+      <div className="relative flex items-center justify-center">
+        <div className="w-12 h-12 border-3 border-[#ff006a]/20 border-t-[#ff006a] border-r-purple-500 rounded-full animate-spin shadow-[0_0_20px_rgba(255,0,106,0.3)]" />
+        <img 
+          src="/icon-48.png" 
+          alt="Animem.uz" 
+          className="absolute w-6 h-6 object-contain rounded-full" 
+        />
+      </div>
+      <span className="text-white/50 text-xs font-semibold tracking-wider uppercase animate-pulse">Yuklanmoqda...</span>
     </div>
   );
 }
@@ -244,9 +249,10 @@ export default function App() {
         <Footer />
       </div>
 
-      {/* 4. Overlay Chat widgets, Mobile Navigation, Ad Modal & Notification Prompt */}
+      {/* 4. Overlay Chat widgets, Mobile Navigation, Ad Modal, Notification Prompt & PWA Install Button */}
       <MobileBottomNav />
       <ChatWidget />
+      <InstallAppButton />
       <SpinBetterAdModal />
       <NotificationPromptModal />
     </div>
