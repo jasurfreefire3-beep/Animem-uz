@@ -382,7 +382,15 @@ export default function Home() {
                           <span className="text-white/50 text-[11px] font-medium">{c.user_name}</span>
                        </div>
                        <div>
-                         <p className="text-white/80 text-xs leading-relaxed group-hover:text-white transition-colors line-clamp-2">{c.content}</p>
+                         <p className="text-white/80 text-xs leading-relaxed group-hover:text-white transition-colors line-clamp-2">
+                           {c.content?.includes('[gif]') || c.content?.includes('api.animem.uz/i/') ? (
+                             <span className="text-[#ff006a] font-medium">
+                               🎬 GIF stiker {c.content.replace(/\[gif\].*?\[\/gif\]/gi, '').trim()}
+                             </span>
+                           ) : (
+                             c.content
+                           )}
+                         </p>
                          <span className="text-[#ff006a]/70 text-[10px] uppercase font-bold mt-2 block">{c.anime_title}</span>
                        </div>
                      </Link>

@@ -871,11 +871,12 @@ const verificationCodes: Record<string, VerificationRecord> = {};
 const passwordResetCodes: Record<string, VerificationRecord> = {};
 const phoneVerificationCodes: Record<string, VerificationRecord> = {};
 const phonePasswordResetCodes: Record<string, VerificationRecord> = {};
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+// MailerSend Email Verification & Password Reset
+const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY || "mlsn.9ea81361dd457046b74a47c43e6336658c47cad963cff9d053da31e478b849e2";
 
 // Helper function to build ultra-stylish Anime-themed HTML Email Template
 function buildAnimeEmailHtml(title: string, subtitle: string, code: string, note: string) {
-  const logoUrl = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSF45hYamscf6EOEVfza62xM3PmDvOBibTRYEmsaMscyw&s=10";
+  const logoUrl = "https://api.animem.uz/i/6aa8e1d1-1550-42c6-8e02-3b28d66a9730";
   const bannerUrl = "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop&q=80";
 
   return `
@@ -946,64 +947,128 @@ function buildAnimeEmailHtml(title: string, subtitle: string, code: string, note
   `;
 }
 
-// Helper to send emails via Resend API with domain and format fallbacks
-async function sendResendEmail(toEmail: string, subject: string, title: string, subtitle: string, code: string, note: string): Promise<{ ok: boolean; error?: string }> {
-  if (!RESEND_API_KEY) {
-    return { ok: false, error: "RESEND_API_KEY o'rnatilmagan" };
+// Helper to send emails via MailerSend API with domain fallbacks and Node IPv4
+async function sendMailerSendEmail(
+  toEmail: string,
+  subject: string,
+  title: string,
+  subtitle: string,
+  code: string,
+  note: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!MAILERSEND_API_KEY) {
+    return { ok: false, error: "MAILERSEND_API_KEY o'rnatilmagan" };
   }
 
-  // Try verified senders or standard fallback
+  // Senders to try (verified domain first)
   const senders = [
-    process.env.RESEND_FROM_EMAIL || "Animem.uz <onboarding@resend.dev>",
-    "onboarding@resend.dev",
-    "Animem.uz <noreply@animem.uz>",
+    {
+      email: process.env.MAILERSEND_FROM_EMAIL || "noreply@animem.uz",
+      name: process.env.MAILERSEND_FROM_NAME || "Animem.uz",
+    },
+    {
+      email: "info@animem.uz",
+      name: "Animem.uz",
+    },
+    {
+      email: "MS_vz9dle@test-vz9dlemxqw14kj50.mlsender.net",
+      name: "Animem.uz",
+    },
   ];
+
+  const htmlContent = buildAnimeEmailHtml(title, subtitle, code, note);
+  const textContent = `${title}\n\n${subtitle}\n\nTasdiqlash kodi: ${code}\n\n${note}\n\n© ${new Date().getFullYear()} Animem.uz`;
 
   let lastError = "";
 
   for (const from of senders) {
     try {
-      const resendResponse = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${RESEND_API_KEY.trim()}`,
-          "Content-Type": "application/json",
+      const payload = JSON.stringify({
+        from: {
+          email: from.email,
+          name: from.name,
         },
-        body: JSON.stringify({
-          from,
-          to: [toEmail],
-          subject,
-          html: buildAnimeEmailHtml(title, subtitle, code, note),
-        }),
+        to: [
+          {
+            email: toEmail,
+            name: "Animem.uz Foydalanuvchisi",
+          },
+        ],
+        subject: subject,
+        text: textContent,
+        html: htmlContent,
       });
 
-      const resendData = await resendResponse.json();
-      console.log(`[Resend API Response from=${from}]:`, resendData);
+      const response = await new Promise<{ statusCode: number; headers: any; body: string }>((resolve, reject) => {
+        const req = https.request(
+          {
+            hostname: "api.mailersend.com",
+            port: 443,
+            path: "/v1/email",
+            method: "POST",
+            family: 4,
+            headers: {
+              "Authorization": `Bearer ${MAILERSEND_API_KEY.trim()}`,
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "User-Agent": "MailerSend-NodeJS/1.0",
+              "Content-Length": Buffer.byteLength(payload),
+            },
+          },
+          (res) => {
+            let body = "";
+            res.on("data", (chunk) => {
+              body += chunk;
+            });
+            res.on("end", () => {
+              resolve({
+                statusCode: res.statusCode || 500,
+                headers: res.headers,
+                body,
+              });
+            });
+          }
+        );
 
-      if (resendResponse.ok && resendData && (resendData.id || resendData.data?.id)) {
+        req.on("error", (err) => {
+          reject(err);
+        });
+
+        req.setTimeout(10000, () => {
+          req.destroy(new Error("MailerSend API timeout"));
+        });
+
+        req.write(payload);
+        req.end();
+      });
+
+      console.log(`[MailerSend API Response from=${from.email}]: status=${response.statusCode}, messageId=${response.headers['x-message-id'] || 'none'}`);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return { ok: true };
       }
 
-      if (typeof resendData.message === "string") {
-        lastError = resendData.message;
-      } else if (resendData.error && typeof resendData.error.message === "string") {
-        lastError = resendData.error.message;
-      } else if (typeof resendData.error === "string") {
-        lastError = resendData.error;
-      } else if (resendData.name === "validation_error") {
-        lastError = resendData.message || "Resend validatsiya xatosi";
-      } else {
-        lastError = "Resend API xatosi";
+      let errorMsg = `MailerSend HTTP ${response.statusCode}`;
+      if (response.body) {
+        try {
+          const parsed = JSON.parse(response.body);
+          if (parsed.message) errorMsg = parsed.message;
+          if (parsed.errors) errorMsg += " (" + JSON.stringify(parsed.errors) + ")";
+        } catch (_) {
+          errorMsg = response.body.slice(0, 200);
+        }
       }
+      lastError = errorMsg;
     } catch (err: any) {
       lastError = err.message || "Email yuborishda xatolik";
+      console.warn(`[MailerSend API Error with ${from.email}]:`, err);
     }
   }
 
   return { ok: false, error: lastError };
 }
 
-// Send 6-digit verification code via Resend
+// Send 6-digit verification code via MailerSend
 app.post("/api/auth/send-code", async (req, res) => {
   try {
     const { email, captchaToken } = req.body;
@@ -1037,10 +1102,10 @@ app.post("/api/auth/send-code", async (req, res) => {
       verified: false,
     };
 
-    console.log(`[Resend Auth] Verification code generated for ${cleanEmail}: ${code}`);
+    console.log(`[MailerSend Auth] Verification code generated for ${cleanEmail}: ${code}`);
 
-    // Send email using Resend API
-    const emailResult = await sendResendEmail(
+    // Send email using MailerSend API
+    const emailResult = await sendMailerSendEmail(
       cleanEmail,
       "Animem.uz - Tasdiqlash kodi: " + code,
       "TASDIQLASH KODI",
@@ -1058,7 +1123,7 @@ app.post("/api/auth/send-code", async (req, res) => {
     }
 
     // Fallback: If external email service fails (e.g. invalid key or unverified domain), preserve code & return devCode
-    console.warn(`[Resend Auth] Email sending failed for ${cleanEmail}: ${emailResult.error}`);
+    console.warn(`[MailerSend Auth] Email sending failed for ${cleanEmail}: ${emailResult.error}`);
     return res.json({
       success: true,
       emailSent: false,
@@ -1108,8 +1173,8 @@ app.post("/api/auth/forgot-password-send-code", async (req, res) => {
 
     console.log(`[Forgot Password] Reset code generated for ${cleanEmail}: ${code}`);
 
-    // Send email via Resend
-    const emailResult = await sendResendEmail(
+    // Send email via MailerSend
+    const emailResult = await sendMailerSendEmail(
       cleanEmail,
       "Animem.uz - Parolni tiklash kodi: " + code,
       "PAROLNI TIKLASH KODI",

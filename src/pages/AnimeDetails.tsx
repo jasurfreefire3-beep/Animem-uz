@@ -15,6 +15,8 @@ import {
   getWatchedEpisodesMap, 
   recordEpisodeWatch 
 } from '../services/watchProgressService';
+import GifPicker from '../components/GifPicker';
+import FormattedContent from '../components/FormattedContent';
 
 export default function AnimeDetails() {
   const params = useParams();
@@ -42,6 +44,8 @@ export default function AnimeDetails() {
   const [similarAnimes, setSimilarAnimes] = useState<Anime[]>([]);
   const [replyingCommentId, setReplyingCommentId] = useState<string | number | null>(null);
   const [replyText, setReplyText] = useState<{ [key: string | number]: string }>({});
+  const [showCommentGifPicker, setShowCommentGifPicker] = useState(false);
+  const [showReplyGifPicker, setShowReplyGifPicker] = useState<string | number | null>(null);
   const [adultConfirmed, setAdultConfirmed] = useState(
     () => localStorage.getItem('animem_18plus_ok') === '1'
   );
@@ -1161,7 +1165,33 @@ export default function AnimeDetails() {
                            placeholder="Add a comment..."
                            className="w-full bg-[#000] border border-[#222] rounded-sm p-3 text-white text-sm focus:outline-none focus:border-[#ff006a]/50 resize-none h-20 mb-3 transition-colors placeholder:text-white/30"
                         />
-                        <div className="flex justify-end">
+                        <div className="flex items-center justify-between">
+                           <div className="relative">
+                              <button
+                                 type="button"
+                                 onClick={() => setShowCommentGifPicker(!showCommentGifPicker)}
+                                 className={`px-2.5 py-1.5 rounded-sm text-xs font-black tracking-wider transition-all cursor-pointer border flex items-center gap-1.5 ${
+                                    showCommentGifPicker
+                                       ? 'text-white bg-[#ff006a] border-[#ff006a] shadow-sm shadow-[#ff006a]/40'
+                                       : 'text-[#ff006a] bg-[#ff006a]/10 border-[#ff006a]/30 hover:bg-[#ff006a] hover:text-white hover:border-[#ff006a]'
+                                 }`}
+                                 title="Anime GIF Stiker qo'shish"
+                              >
+                                 GIF
+                              </button>
+                              {showCommentGifPicker && (
+                                 <div className="absolute top-full left-0 mt-2 z-50">
+                                    <GifPicker
+                                       onSelectGif={(gifUrl) => {
+                                          setNewComment((prev) => (prev ? `${prev} [gif]${gifUrl}[/gif]` : `[gif]${gifUrl}[/gif]`));
+                                          setShowCommentGifPicker(false);
+                                       }}
+                                       onClose={() => setShowCommentGifPicker(false)}
+                                    />
+                                 </div>
+                              )}
+                           </div>
+
                            <button type="submit" className="bg-[#ff006a] hover:bg-[#d40058] text-white px-5 py-2 rounded-sm text-xs font-bold flex items-center gap-1.5 transition-colors">
                               <Send size={14}/> Post
                            </button>
@@ -1236,7 +1266,9 @@ export default function AnimeDetails() {
                                     </button>
                                  )}
                               </div>
-                              <p className="text-white/80 text-sm leading-relaxed mb-3">{comment.content}</p>
+                              <div className="text-white/80 text-sm leading-relaxed mb-3">
+                                 <FormattedContent content={comment.content} />
+                              </div>
 
                               {/* Action buttons: Like, Dislike, Reply */}
                               <div className="flex items-center gap-4 text-xs text-white/50">
@@ -1280,7 +1312,9 @@ export default function AnimeDetails() {
                                                 <span className="text-white/90 text-xs font-bold">{rep.user_name}</span>
                                                 <span className="text-white/35 text-[9px] ml-auto">{new Date(rep.created_at).toLocaleDateString()}</span>
                                              </div>
-                                             <p className="text-white/70 text-xs leading-relaxed">{rep.content}</p>
+                                             <div className="text-white/70 text-xs leading-relaxed">
+                                                <FormattedContent content={rep.content} />
+                                             </div>
                                           </div>
                                        </div>
                                     ))}
@@ -1296,20 +1330,54 @@ export default function AnimeDetails() {
                                        placeholder="Javob yozish..."
                                        className="w-full bg-[#000] border border-[#222] rounded-sm p-2 text-white text-xs focus:outline-none focus:border-[#ff006a]/50 resize-none h-16 mb-2 placeholder:text-white/30"
                                     />
-                                    <div className="flex justify-end gap-2">
-                                       <button 
-                                          type="button" 
-                                          onClick={() => setReplyingCommentId(null)}
-                                          className="px-3 py-1 rounded bg-[#222] hover:bg-[#333] text-white/70 text-xs font-bold transition-colors"
-                                       >
-                                          Bekor qilish
-                                       </button>
-                                       <button 
-                                          type="submit" 
-                                          className="px-3 py-1 rounded bg-[#ff006a] hover:bg-[#d40058] text-white text-xs font-bold transition-colors flex items-center gap-1"
-                                       >
-                                          <Send size={11} /> Yuborish
-                                       </button>
+                                    <div className="flex items-center justify-between">
+                                       <div className="relative">
+                                          <button
+                                             type="button"
+                                             onClick={() => setShowReplyGifPicker(showReplyGifPicker === comment.id ? null : comment.id)}
+                                             className={`px-2 py-1 rounded-sm text-[11px] font-black tracking-wider transition-all cursor-pointer border flex items-center gap-1 ${
+                                                showReplyGifPicker === comment.id
+                                                   ? 'text-white bg-[#ff006a] border-[#ff006a]'
+                                                   : 'text-[#ff006a] bg-[#ff006a]/10 border-[#ff006a]/30 hover:bg-[#ff006a] hover:text-white'
+                                             }`}
+                                             title="GIF Stiker qo'shish"
+                                          >
+                                             GIF
+                                          </button>
+                                          {showReplyGifPicker === comment.id && (
+                                             <div className="absolute bottom-full left-0 mb-2 z-50">
+                                                <GifPicker
+                                                   onSelectGif={(gifUrl) => {
+                                                      setReplyText((prev) => ({
+                                                         ...prev,
+                                                         [comment.id]: prev[comment.id] ? `${prev[comment.id]} [gif]${gifUrl}[/gif]` : `[gif]${gifUrl}[/gif]`
+                                                      }));
+                                                      setShowReplyGifPicker(null);
+                                                   }}
+                                                   onClose={() => setShowReplyGifPicker(null)}
+                                                />
+                                             </div>
+                                          )}
+                                       </div>
+
+                                       <div className="flex justify-end gap-2">
+                                          <button 
+                                             type="button" 
+                                             onClick={() => {
+                                                setReplyingCommentId(null);
+                                                setShowReplyGifPicker(null);
+                                             }}
+                                             className="px-3 py-1 rounded bg-[#222] hover:bg-[#333] text-white/70 text-xs font-bold transition-colors"
+                                          >
+                                             Bekor qilish
+                                          </button>
+                                          <button 
+                                             type="submit" 
+                                             className="px-3 py-1 rounded bg-[#ff006a] hover:bg-[#d40058] text-white text-xs font-bold transition-colors flex items-center gap-1"
+                                          >
+                                             <Send size={11} /> Yuborish
+                                          </button>
+                                       </div>
                                     </div>
                                  </form>
                               )}

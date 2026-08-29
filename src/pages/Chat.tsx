@@ -7,7 +7,8 @@ import { Send, Sparkles, Trash2, CornerUpLeft, X, Mic, Smile, ChevronDown } from
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import AudioMessage, { parseMessageContent } from '../components/AudioMessage';
-import EmojiPicker from '../components/EmojiPicker';
+import GifPicker from '../components/GifPicker';
+import FormattedContent, { isGifContent } from '../components/FormattedContent';
 
 const CHAT_BG_IMAGE = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRbK8qI1E3BjTK74xv_20a3cTlFO8toJzzRqbJmZHUE4Qrg4dAKPrWmyZw&s=10";
 
@@ -112,6 +113,10 @@ const MemoizedMessage = memo(({
                   <span className="flex items-center gap-1 text-[#ff006a]">
                     <Mic size={10} /> Ovozli xabar
                   </span>
+                ) : isGifContent(parsedReply?.text || msg.reply_to_content) ? (
+                  <span className="flex items-center gap-1 text-[#ff006a]">
+                    <Sparkles size={10} /> GIF Stiker
+                  </span>
                 ) : (
                   parsedReply?.text || msg.reply_to_content
                 )}
@@ -126,7 +131,7 @@ const MemoizedMessage = memo(({
               isMe={isMe}
             />
           ) : (
-            <span>{parsedContent.text}</span>
+            <FormattedContent content={parsedContent.text || msg.content} />
           )}
         </div>
       </div>
@@ -472,8 +477,17 @@ export default function Chat() {
     setRecordingDuration(0);
   };
 
-  const handleSelectEmoji = (emoji: string) => {
-    setInput(prev => prev + emoji);
+  const handleSelectGif = async (gifUrl: string) => {
+    setShowEmojiPicker(false);
+    await sendChatMessage(`[gif]${gifUrl}[/gif]`);
+  };
+
+  const handleSelectEmoji = (emojiOrGif: string) => {
+    if (emojiOrGif.startsWith('[gif]') || emojiOrGif.startsWith('http')) {
+      handleSelectGif(emojiOrGif.replace(/\[\/?gif\]/g, ''));
+      return;
+    }
+    setInput(prev => prev + emojiOrGif);
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -697,12 +711,12 @@ export default function Chat() {
             )}
           </AnimatePresence>
 
-          {/* Emoji Picker Popover */}
+          {/* GIF Picker Popover */}
           <AnimatePresence>
             {showEmojiPicker && (
               <div className="absolute bottom-20 left-4 z-50">
-                <EmojiPicker
-                  onSelectEmoji={handleSelectEmoji}
+                <GifPicker
+                  onSelectGif={handleSelectGif}
                   onClose={() => setShowEmojiPicker(false)}
                 />
               </div>
@@ -764,15 +778,18 @@ export default function Chat() {
             ) : (
               /* Standard Input Bar */
               <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
+                {/* GIF Trigger Button */}
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className={`p-2.5 rounded-sm transition-colors cursor-pointer ${
-                    showEmojiPicker ? 'text-[#ff006a] bg-white/10' : 'text-white/40 hover:text-white hover:bg-white/5'
+                  className={`px-3 py-1.5 rounded-sm text-xs font-black tracking-wider transition-all cursor-pointer border ${
+                    showEmojiPicker
+                      ? 'text-white bg-[#ff006a] border-[#ff006a] shadow-sm shadow-[#ff006a]/40 scale-105'
+                      : 'text-[#ff006a] bg-[#ff006a]/10 border-[#ff006a]/30 hover:bg-[#ff006a] hover:text-white hover:border-[#ff006a]'
                   }`}
-                  title="Emojilar"
+                  title="Anime GIF Stikerlar"
                 >
-                  <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
+                  GIF
                 </button>
 
                 <input
