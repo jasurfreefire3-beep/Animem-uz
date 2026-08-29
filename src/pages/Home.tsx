@@ -5,7 +5,6 @@ import { Star, PlayCircle, Calendar, Play, Clock, Grid, MessageSquare, ChevronLe
 import { motion, AnimatePresence } from 'motion/react';
 import AnimeCard from '../components/AnimeCard';
 import ContinueWatchingShelf from '../components/ContinueWatchingShelf';
-import DirectLinkAdBanner from '../components/DirectLinkAdBanner';
 import { useAuth } from '../context/AuthContext';
 
 export default function Home() {
@@ -255,9 +254,6 @@ export default function Home() {
 
       {/* Continue Watching Shelf (Only shows when user has watch progress) */}
       <ContinueWatchingShelf />
-
-      {/* PropellerAds Direct Link Banner */}
-      <DirectLinkAdBanner />
 
       {/* Main Content Layout */}
       <div className="flex flex-col xl:flex-row gap-8">

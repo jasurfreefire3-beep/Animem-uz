@@ -8,7 +8,6 @@ import VideoPlayer from '../components/VideoPlayer';
 import AgeGate from '../components/AgeGate';
 import AdBanner728x90 from '../components/AdBanner728x90';
 import NativeBannerAd from '../components/NativeBannerAd';
-import DirectLinkAdBanner from '../components/DirectLinkAdBanner';
 import PersonalListButton from '../components/PersonalListButton';
 import { setActiveAnimeViewing } from '../hooks/usePresenceTracker';
 import { 
@@ -962,9 +961,6 @@ export default function AnimeDetails() {
                   </div>
                </div>
             </motion.section>
-
-            {/* PropellerAds Direct Link Sponsored Banner */}
-            <DirectLinkAdBanner />
 
             {/* 728x90 Advertisement Banner */}
             <AdBanner728x90 />
