@@ -45,11 +45,11 @@ function PageLoader() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] w-full gap-3">
       <div className="relative flex items-center justify-center">
-        <div className="w-12 h-12 border-3 border-[#ff006a]/20 border-t-[#ff006a] border-r-purple-500 rounded-full animate-spin shadow-[0_0_20px_rgba(255,0,106,0.3)]" />
+        <div className="w-14 h-14 border-3 border-[#ff006a]/20 border-t-[#ff006a] border-r-purple-500 rounded-full animate-spin shadow-[0_0_20px_rgba(255,0,106,0.3)]" />
         <img 
-          src="/icon-48.png" 
+          src="https://api.animem.uz/i/6aa8e1d1-1550-42c6-8e02-3b28d66a9730" 
           alt="Animem.uz" 
-          className="absolute w-6 h-6 object-contain rounded-full" 
+          className="absolute w-8 h-8 object-contain rounded-full" 
         />
       </div>
       <span className="text-white/50 text-xs font-semibold tracking-wider uppercase animate-pulse">Yuklanmoqda...</span>

@@ -29,6 +29,7 @@ export default function Admin() {
   const [studiyasi, setStudiyasi] = useState('');
   const [qismlarSoni, setQismlarSoni] = useState('');
   const [tags, setTags] = useState('');
+  const [telegramUrl, setTelegramUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [tavsiya, setTavsiya] = useState(false);
   const [isBanner, setIsBanner] = useState(false);
@@ -122,6 +123,7 @@ export default function Admin() {
         studiyasi,
         qismlar_soni: qismlarSoni ? parseInt(qismlarSoni) : 0,
         janrlar: selectedGenres.join(', '),
+        telegram_url: telegramUrl,
         video_url: videoUrl,
         tavsiya: tavsiya ? 1 : 0,
         is_banner: isBanner ? 1 : 0,
@@ -171,6 +173,7 @@ export default function Admin() {
       setStudiyasi('');
       setQismlarSoni('');
       setSelectedGenres([]);
+      setTelegramUrl('');
       setVideoUrl('');
       setTavsiya(false);
       setIsBanner(false);
@@ -208,6 +211,7 @@ export default function Admin() {
       : [];
     setSelectedGenres(parsedGenres);
     
+    setTelegramUrl(anime.telegram_url || '');
     setVideoUrl(anime.video_url || '');
     setTavsiya(!!anime.tavsiya);
     setIsBanner(!!anime.is_banner);
@@ -230,6 +234,7 @@ export default function Admin() {
     setStudiyasi('');
     setQismlarSoni('');
     setSelectedGenres([]);
+    setTelegramUrl('');
     setVideoUrl('');
     setTavsiya(false);
     setIsBanner(false);
@@ -921,6 +926,37 @@ export default function Admin() {
                     Tanlanganlar: <span className="text-[#ff006a] font-bold">{selectedGenres.map(g => GENRE_MAP[g] || g).join(', ')}</span>
                   </p>
                 )}
+              </div>
+
+              {/* Telegram Havola (Direct Telegram Link) */}
+              <div className="md:col-span-2 space-y-1.5 p-3.5 bg-[#050508] border border-[#0088cc]/30 rounded-sm">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-white flex items-center gap-2 uppercase tracking-wide">
+                    <img 
+                      src="https://api.animem.uz/i/2f5df3e0-bd69-4fd4-b558-429a47091414" 
+                      alt="Telegram" 
+                      className="w-4 h-4 object-contain rounded-full" 
+                    />
+                    <span>Telegram Havola (Telegram Link)</span>
+                  </label>
+                  <span className="text-[10px] text-[#0088cc] font-medium">Player va qismlar orasida 'Telegramda ko'rish' tugmasi chiqadi</span>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <img 
+                      src="https://api.animem.uz/i/2f5df3e0-bd69-4fd4-b558-429a47091414" 
+                      alt="Telegram" 
+                      className="w-4 h-4 object-contain opacity-70" 
+                    />
+                  </div>
+                  <input
+                    type="url"
+                    value={telegramUrl}
+                    placeholder="https://t.me/Animem_uz_bot?start=... yoki https://t.me/kanal_nomi"
+                    onChange={(e) => setTelegramUrl(e.target.value)}
+                    className="w-full bg-[#000] border border-[#222] rounded-sm pl-10 pr-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:border-[#0088cc] transition-colors text-sm"
+                  />
+                </div>
               </div>
 
               {/* Episode 1 URL */}

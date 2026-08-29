@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Anime, Comment, translateGenre, toSlug } from '../types';
-import { Star, MessageSquare, Send, Clock, Play, Plus, Calendar, Building, ListOrdered, Share2, Heart, Flag, PlayCircle, Eye, Shield, Moon, Sun, Trash2, Trophy, X, ThumbsUp, ThumbsDown, MessageCircle, ArrowLeft } from 'lucide-react';
+import { Star, MessageSquare, Send, Clock, Play, Plus, Calendar, Building, ListOrdered, Share2, Heart, Flag, PlayCircle, Eye, Shield, Moon, Sun, Trash2, Trophy, X, ThumbsUp, ThumbsDown, MessageCircle, ArrowLeft, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import VideoPlayer from '../components/VideoPlayer';
 import AgeGate from '../components/AgeGate';
 import AdBanner728x90 from '../components/AdBanner728x90';
 import NativeBannerAd from '../components/NativeBannerAd';
+import DirectLinkAdBanner from '../components/DirectLinkAdBanner';
 import PersonalListButton from '../components/PersonalListButton';
 import { setActiveAnimeViewing } from '../hooks/usePresenceTracker';
 import { 
@@ -874,6 +875,48 @@ export default function AnimeDetails() {
                  )}
                </div>
 
+               {/* Telegramda ko'rish (Elongated Banner Button) */}
+               {anime.telegram_url && anime.telegram_url.trim() !== '' && (
+                 <div className="mb-4">
+                   <a
+                     href={anime.telegram_url}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     className="group relative w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 bg-gradient-to-r from-[#0088cc]/20 via-[#0088cc]/10 to-[#0088cc]/25 hover:from-[#0088cc]/35 hover:via-[#0088cc]/20 hover:to-[#0088cc]/40 border border-[#0088cc]/50 hover:border-[#0088cc] rounded-xl sm:rounded-2xl transition-all duration-300 shadow-[0_0_20px_rgba(0,136,204,0.18)] hover:shadow-[0_0_30px_rgba(0,136,204,0.38)] overflow-hidden"
+                   >
+                     <div className="flex items-center gap-3 sm:gap-4 relative z-10">
+                       <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#0088cc]/20 flex items-center justify-center p-1.5 ring-2 ring-[#0088cc]/40 group-hover:scale-110 transition-transform shrink-0">
+                         <img 
+                           src="https://api.animem.uz/i/2f5df3e0-bd69-4fd4-b558-429a47091414" 
+                           alt="Telegram" 
+                           className="w-full h-full object-contain" 
+                         />
+                       </div>
+                       <div className="text-left">
+                         <div className="text-sm sm:text-base font-black text-white group-hover:text-cyan-300 transition-colors flex items-center gap-2">
+                           <span>Telegramda ko'rish</span>
+                           <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-[#0088cc]/30 text-cyan-300 border border-[#0088cc]/40 uppercase tracking-wider">
+                             HD / Tezkor
+                           </span>
+                         </div>
+                         <p className="text-[11px] sm:text-xs text-white/60 line-clamp-1">
+                           Ushbu animeni to'liq Telegram kanalimizda tomosha qiling
+                         </p>
+                       </div>
+                     </div>
+                     <div className="flex items-center gap-2 relative z-10">
+                       <span className="hidden sm:inline-block text-xs font-bold text-[#0088cc] group-hover:text-white transition-colors">
+                         Kanalga o'tish
+                       </span>
+                       <div className="w-8 h-8 rounded-full bg-[#0088cc] text-white flex items-center justify-center group-hover:translate-x-1 transition-transform shadow-[0_0_12px_rgba(0,136,204,0.6)]">
+                         <ExternalLink className="w-4 h-4" />
+                       </div>
+                     </div>
+                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full duration-1000 transition-transform pointer-events-none" />
+                   </a>
+                 </div>
+               )}
+
                {/* Episode Selector */}
                <div className="animem-episodes-panel px-4 md:px-6 py-5">
                   <div className="flex items-center justify-between mb-3.5">
@@ -919,6 +962,9 @@ export default function AnimeDetails() {
                   </div>
                </div>
             </motion.section>
+
+            {/* PropellerAds Direct Link Sponsored Banner */}
+            <DirectLinkAdBanner />
 
             {/* 728x90 Advertisement Banner */}
             <AdBanner728x90 />

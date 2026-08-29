@@ -535,6 +535,13 @@ async function testDbConnection() {
     } catch(e) {}
 
     try {
+      const [tgCols]: any = await connection.query(`SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'animes' AND COLUMN_NAME = 'telegram_url' AND TABLE_SCHEMA = DATABASE()`);
+      if (tgCols.length === 0) {
+        await connection.query(`ALTER TABLE animes ADD COLUMN telegram_url VARCHAR(500) DEFAULT NULL`);
+      }
+    } catch(e) {}
+
+    try {
       const [mCols]: any = await connection.query(`SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'mangas' AND COLUMN_NAME = 'tags' AND TABLE_SCHEMA = DATABASE()`);
       if (mCols.length === 0) {
         await connection.query(`ALTER TABLE mangas ADD COLUMN tags VARCHAR(255) DEFAULT NULL`);
@@ -3346,6 +3353,7 @@ app.post("/api/animes", authenticateToken, async (req: any, res) => {
       qismlar_soni,
       korishlar,
       janrlar,
+      telegram_url,
       video_url,
       tavsiya,
       is_banner,
@@ -3357,8 +3365,8 @@ app.post("/api/animes", authenticateToken, async (req: any, res) => {
     try {
       const [result]: any = await dbQuery(
         `INSERT INTO animes 
-        (title, description, image_url, banner_url, rating, rating_count, holati, yil, studiyasi, qismlar_soni, korishlar, janrlar, video_url, tavsiya, is_banner, tags, is_adult) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (title, description, image_url, banner_url, rating, rating_count, holati, yil, studiyasi, qismlar_soni, korishlar, janrlar, telegram_url, video_url, tavsiya, is_banner, tags, is_adult) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           title || "",
           description || "",
@@ -3372,6 +3380,7 @@ app.post("/api/animes", authenticateToken, async (req: any, res) => {
           qismlar_soni || 0,
           korishlar || 0,
           janrlar || "",
+          telegram_url || "",
           video_url || "",
           tavsiya ? 1 : 0,
           is_banner ? 1 : 0,
@@ -3401,6 +3410,7 @@ app.post("/api/animes", authenticateToken, async (req: any, res) => {
       qismlar_soni: qismlar_soni ? Number(qismlar_soni) : 0,
       korishlar: korishlar ? Number(korishlar) : 0,
       janrlar: janrlar || "",
+      telegram_url: telegram_url || "",
       video_url: video_url || "",
       tavsiya: Boolean(tavsiya),
       is_banner: Boolean(is_banner),
@@ -3440,6 +3450,7 @@ app.put("/api/animes/:id", authenticateToken, async (req: any, res) => {
       qismlar_soni,
       korishlar,
       janrlar,
+      telegram_url,
       video_url,
       tavsiya,
       is_banner,
@@ -3480,6 +3491,7 @@ app.put("/api/animes/:id", authenticateToken, async (req: any, res) => {
     const finalStudiyasi = studiyasi !== undefined ? studiyasi : (existing?.studiyasi || "");
     const finalQismlarSoni = qismlar_soni !== undefined ? Number(qismlar_soni) : (existing?.qismlar_soni || 0);
     const finalJanrlar = janrlar !== undefined ? janrlar : (existing?.janrlar || "");
+    const finalTelegramUrl = telegram_url !== undefined ? telegram_url : (existing?.telegram_url || "");
     const finalVideoUrl = video_url !== undefined ? video_url : (existing?.video_url || "");
     const finalTavsiya = tavsiya !== undefined ? (tavsiya ? 1 : 0) : (existing?.tavsiya ? 1 : 0);
     const finalIsBanner = is_banner !== undefined ? (is_banner ? 1 : 0) : (existing?.is_banner ? 1 : 0);
@@ -3490,7 +3502,7 @@ app.put("/api/animes/:id", authenticateToken, async (req: any, res) => {
       await dbQuery(
         `UPDATE animes SET 
         title = ?, description = ?, image_url = ?, banner_url = ?, rating = ?, rating_count = ?, 
-        holati = ?, yil = ?, studiyasi = ?, qismlar_soni = ?, korishlar = ?, janrlar = ?, video_url = ?, tavsiya = ?, is_banner = ?, tags = ?, is_adult = ? 
+        holati = ?, yil = ?, studiyasi = ?, qismlar_soni = ?, korishlar = ?, janrlar = ?, telegram_url = ?, video_url = ?, tavsiya = ?, is_banner = ?, tags = ?, is_adult = ? 
         WHERE id = ?`,
         [
           finalTitle,
@@ -3505,6 +3517,7 @@ app.put("/api/animes/:id", authenticateToken, async (req: any, res) => {
           finalQismlarSoni,
           finalKorishlar,
           finalJanrlar,
+          finalTelegramUrl,
           finalVideoUrl,
           finalTavsiya,
           finalIsBanner,
@@ -3534,6 +3547,7 @@ app.put("/api/animes/:id", authenticateToken, async (req: any, res) => {
       qismlar_soni: finalQismlarSoni,
       korishlar: finalKorishlar,
       janrlar: finalJanrlar,
+      telegram_url: finalTelegramUrl,
       video_url: finalVideoUrl,
       tavsiya: Boolean(finalTavsiya),
       is_banner: Boolean(finalIsBanner),

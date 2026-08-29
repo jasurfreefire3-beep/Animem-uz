@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Instagram, Youtube, ShieldCheck, FileText, Copyright, Mail, Tv, BookOpen, Flame, Calendar } from 'lucide-react';
 import AdBanner728x90 from './AdBanner728x90';
+import DirectLinkAdBanner from './DirectLinkAdBanner';
 import { TikTokIcon } from './SocialIcons';
 
 const TelegramIcon = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
@@ -22,7 +23,8 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Ad Banner Placement */}
-        <div className="mb-8">
+        <div className="mb-8 space-y-4">
+          <DirectLinkAdBanner />
           <AdBanner728x90 />
         </div>
 

@@ -36,6 +36,7 @@ export interface Anime {
   qismlar_soni: number;
   janrlar: string;
   tags?: string;
+  telegram_url?: string;
   video_url: string;
   tavsiya: boolean;
   is_banner?: boolean | number;

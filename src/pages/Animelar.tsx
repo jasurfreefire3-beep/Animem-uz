@@ -5,6 +5,7 @@ import { Star, Play, Grid, List, Film, Eye, Search, X, ChevronDown } from 'lucid
 import { motion } from 'motion/react';
 import AnimeCard from '../components/AnimeCard';
 import AdBanner728x90 from '../components/AdBanner728x90';
+import DirectLinkAdBanner from '../components/DirectLinkAdBanner';
 
 // Calculate responsive batch size (approx. 2.5 - 3 rows depending on device)
 const getBatchSize = () => {
@@ -236,6 +237,9 @@ export default function Animelar() {
           );
         })}
       </div>
+
+      {/* PropellerAds Direct Link Sponsored Banner */}
+      <DirectLinkAdBanner />
 
       {/* 728x90 Advertisement Banner */}
       <AdBanner728x90 />
