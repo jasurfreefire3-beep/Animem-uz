@@ -13,6 +13,7 @@ import {
   TelegramIcon, InstagramIcon, TikTokIcon, YouTubeIcon, 
   DiscordIcon, FacebookIcon, VKIcon 
 } from '../components/SocialIcons';
+import LoadingScreen from '../components/LoadingScreen';
 
 // Default banner if none provided
 const DEFAULT_BANNER = "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1200&auto=format&fit=crop&q=80";
@@ -384,11 +385,7 @@ export default function Profil() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-[#ff006a] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingScreen size="lg" />;
   }
 
   // If user is not logged in and didn't specify another user's id

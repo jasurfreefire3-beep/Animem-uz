@@ -5,6 +5,7 @@ import { Comment } from '../types';
 import { BookOpen, Star, Eye, Layers, User, Calendar, ArrowLeft, Play, Clock, Sparkles, Share2, Check, Copy, MessageSquare, Send, ThumbsUp, ThumbsDown, MessageCircle, Trash2, X } from 'lucide-react';
 import { Manga, MangaChapter } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import LoadingScreen from '../components/LoadingScreen';
 
 interface MangaDetailResponse extends Manga {
   chapters: MangaChapter[];
@@ -173,11 +174,7 @@ export default function MangaDetails() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#ff006a] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingScreen size="lg" />;
   }
 
   if (error || !manga) {

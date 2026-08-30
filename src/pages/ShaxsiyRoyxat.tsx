@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
+import LoadingScreen from '../components/LoadingScreen';
 import { 
   getAllUserLists, 
   setUserListStatus, 
@@ -135,12 +136,7 @@ export default function ShaxsiyRoyxat() {
   ];
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[55vh] gap-3">
-        <div className="w-10 h-10 border-4 border-[#ff006a] border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(255,0,106,0.4)]" />
-        <span className="text-white/50 text-xs font-semibold uppercase tracking-wider">Ro'yxat yuklanmoqda...</span>
-      </div>
-    );
+    return <LoadingScreen size="lg" />;
   }
 
   return (

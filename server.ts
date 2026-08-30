@@ -14,8 +14,23 @@ import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import { GoogleGenAI } from "@google/genai";
 import compression from "compression";
+import webpush from "web-push";
 
 dotenv.config();
+
+// Setup VAPID keys for Web Push Notifications (Works even when user is offline / site is closed)
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "BNo_Gg_l4U1Gj1c-E7B68Y52p7dO64lXvC4L91x5NlB1qGgJ7fK1lZlU9sX4_y9zL2pX2s9k-M6Z3q1j5a4g6gE";
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "K7mQ6lX_3s9k4p1j8a2g5dE6bL1qZlU9sX4y2z0pX1c";
+
+try {
+  webpush.setVapidDetails(
+    "mailto:support@animem.uz",
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
+} catch (e) {
+  console.warn("VAPID setup notice:", e);
+}
 
 const upload = multer({ dest: "/tmp/" });
 
@@ -320,10 +335,31 @@ async function testDbConnection() {
       CREATE TABLE IF NOT EXISTS notifications (
         id INT AUTO_INCREMENT PRIMARY KEY,
         message TEXT NOT NULL,
+        image LONGTEXT DEFAULT NULL,
+        url VARCHAR(500) DEFAULT '/',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    try {
+      await connection.query(`ALTER TABLE notifications ADD COLUMN image LONGTEXT DEFAULT NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE notifications ADD COLUMN url VARCHAR(500) DEFAULT '/'`);
+    } catch (e) {}
     console.log("Verified notifications table in MySQL.");
+
+    // Create push_subscriptions table for background device push notifications
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        endpoint TEXT NOT NULL,
+        p256dh VARCHAR(255) NOT NULL,
+        auth VARCHAR(255) NOT NULL,
+        user_id INT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB
+    `);
+    console.log("Verified push_subscriptions table in MySQL.");
 
     // Check if avatar_url column exists in users
     const [columns]: any = await connection.query(`
@@ -1967,6 +2003,97 @@ app.post("/api/auth/phone-reset-password", async (req, res) => {
   }
 });
 
+// Web Push Broadcast Function (Delivers notifications to devices even when site is closed)
+async function broadcastPushNotification(payload: {
+  title: string;
+  body: string;
+  image?: string;
+  icon?: string;
+  badge?: string;
+  url?: string;
+  tag?: string;
+}) {
+  try {
+    let subs: any[] = [];
+    try {
+      const [rows]: any = await dbQuery("SELECT * FROM push_subscriptions");
+      if (Array.isArray(rows)) subs = rows;
+    } catch (e) {
+      console.warn("Fetch push subscriptions error:", e);
+    }
+
+    if (subs.length === 0) return;
+
+    const APP_DEFAULT_ICON = "https://api.animem.uz/api/images/1788100529230_au9wggu";
+    const notificationPayload = JSON.stringify({
+      title: payload.title || "Animem.uz",
+      body: payload.body || "",
+      image: payload.image || undefined,
+      icon: payload.icon || APP_DEFAULT_ICON,
+      badge: payload.badge || APP_DEFAULT_ICON,
+      url: payload.url || "/",
+      data: { url: payload.url || "/" },
+      tag: payload.tag || `animem-${Date.now()}`
+    });
+
+    const sendPromises = subs.map(async (sub) => {
+      try {
+        const pushSubscription = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.p256dh,
+            auth: sub.auth
+          }
+        };
+        await webpush.sendNotification(pushSubscription, notificationPayload);
+      } catch (err: any) {
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          await dbQuery("DELETE FROM push_subscriptions WHERE id = ?", [sub.id]).catch(() => {});
+        }
+      }
+    });
+
+    await Promise.allSettled(sendPromises);
+    console.log(`[WebPush] Dispatched push notification to ${subs.length} active device subscriptions`);
+  } catch (err) {
+    console.error("[WebPush Broadcast Error]:", err);
+  }
+}
+
+// Get VAPID public key for Web Push registration
+app.get("/api/push/vapid-public-key", (req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+// Subscribe to Web Push notifications (stores subscription in MySQL)
+app.post("/api/push/subscribe", async (req, res) => {
+  try {
+    const { subscription, userId } = req.body;
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({ error: "Yaroqsiz push obuna ma'lumotlari" });
+    }
+
+    const endpoint = subscription.endpoint;
+    const p256dh = subscription.keys.p256dh;
+    const auth = subscription.keys.auth;
+
+    try {
+      await dbQuery(
+        `INSERT INTO push_subscriptions (endpoint, p256dh, auth, user_id) 
+         VALUES (?, ?, ?, ?) 
+         ON DUPLICATE KEY UPDATE p256dh = VALUES(p256dh), auth = VALUES(auth), user_id = VALUES(user_id)`,
+        [endpoint, p256dh, auth, userId || null]
+      );
+    } catch (e) {
+      console.warn("Push subscription DB save error:", e);
+    }
+
+    res.json({ success: true, message: "Push bildirishnomalarga muvaffaqiyatli obuna bo'lindi" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Push obunada xatolik" });
+  }
+});
+
 // Get all notifications from MySQL with local store fallback
 app.get("/api/notifications", async (req, res) => {
   try {
@@ -1985,7 +2112,7 @@ app.get("/api/notifications", async (req, res) => {
 app.post("/api/notifications", authenticateToken, async (req: any, res) => {
   try {
     if (req.user.role !== "admin") return res.sendStatus(403);
-    const { message } = req.body;
+    const { message, image, url } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ error: "Xabar matni bo'sh bo'lishi mumkin emas!" });
     }
@@ -1993,8 +2120,8 @@ app.post("/api/notifications", authenticateToken, async (req: any, res) => {
     let insertId = Date.now();
     try {
       const [result]: any = await dbQuery(
-        "INSERT INTO notifications (message) VALUES (?)",
-        [message.trim()]
+        "INSERT INTO notifications (message, image, url) VALUES (?, ?, ?)",
+        [message.trim(), image || null, url || "/"]
       );
       if (result && result.insertId) insertId = result.insertId;
     } catch (e) {
@@ -2005,11 +2132,22 @@ app.post("/api/notifications", authenticateToken, async (req: any, res) => {
     const newNotif = {
       id: insertId,
       message: message.trim(),
+      image: image || undefined,
+      url: url || "/",
       created_at: new Date().toISOString()
     };
     store.notifications = store.notifications || [];
     store.notifications.unshift(newNotif);
     saveLocalStore(store);
+
+    // Send Web Push notification to all devices (whether online or offline)
+    broadcastPushNotification({
+      title: "Animem.uz | Muhim Yangilik 📢",
+      body: message.trim(),
+      image: image || undefined,
+      url: url || "/",
+      tag: `admin-notif-${insertId}`
+    }).catch(() => {});
 
     res.status(201).json(newNotif);
   } catch (err) {
@@ -3681,6 +3819,15 @@ app.post("/api/animes", authenticateToken, async (req: any, res) => {
 
     // Notify Telegram
     notifyTelegramNewAnime(insertId, qismlar_soni ? Number(qismlar_soni) : null);
+
+    // Broadcast Web Push to all devices with anime image
+    broadcastPushNotification({
+      title: "Animem.uz | Yangi Anime Qo'shildi! 🎬",
+      body: `"${title}" o'zbek tilida joylandi (${qismlar_soni ? `${qismlar_soni} qism` : 'Film'}). Hoziroq tomosha qiling!`,
+      image: image_url || banner_url || undefined,
+      url: `/anime/${(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`,
+      tag: `anime-${insertId}`
+    }).catch(() => {});
 
     res.status(201).json({ id: insertId });
   } catch (err) {

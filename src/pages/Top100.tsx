@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Anime, toSlug } from '../types';
 import { Star, Award, Eye, Play } from 'lucide-react';
 import { motion } from 'motion/react';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function Top100() {
   const [animes, setAnimes] = useState<Anime[]>([]);
@@ -29,11 +30,7 @@ export default function Top100() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-10 h-10 border-4 border-[#ff006a] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingScreen size="lg" />;
   }
 
   return (

@@ -17,6 +17,7 @@ import {
 } from '../services/watchProgressService';
 import GifPicker from '../components/GifPicker';
 import FormattedContent from '../components/FormattedContent';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function AnimeDetails() {
   const params = useParams();
@@ -522,11 +523,7 @@ export default function AnimeDetails() {
     } catch(e) {}
   };
 
-  if (!anime) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(139,92,246,0.5)]" />
-    </div>
-  );
+  if (!anime) return <LoadingScreen size="lg" />;
 
   const handleBack = (e?: React.MouseEvent) => {
     if (e) {

@@ -14,6 +14,8 @@ import Footer from './components/Footer';
 
 import { AdminPasscodeGate } from './components/AdminPasscodeGate';
 import { usePresenceTracker } from './hooks/usePresenceTracker';
+import { useLanguage } from './context/LanguageContext';
+import LoadingScreen from './components/LoadingScreen';
 
 // Code-split pages with React.lazy for instant initial bundle loading
 const Login = lazy(() => import('./pages/Login'));
@@ -42,22 +44,11 @@ const DMCA = lazy(() => import('./pages/DMCA'));
 const Aloqa = lazy(() => import('./pages/Aloqa'));
 
 function PageLoader() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] w-full gap-3">
-      <div className="relative flex items-center justify-center">
-        <div className="w-14 h-14 border-3 border-[#ff006a]/20 border-t-[#ff006a] border-r-purple-500 rounded-full animate-spin shadow-[0_0_20px_rgba(255,0,106,0.3)]" />
-        <img 
-          src="https://api.animem.uz/i/6aa8e1d1-1550-42c6-8e02-3b28d66a9730" 
-          alt="Animem.uz" 
-          className="absolute w-8 h-8 object-contain rounded-full" 
-        />
-      </div>
-      <span className="text-white/50 text-xs font-semibold tracking-wider uppercase animate-pulse">Yuklanmoqda...</span>
-    </div>
-  );
+  return <LoadingScreen size="lg" />;
 }
 
 export default function App() {
+  const { t } = useLanguage();
   usePresenceTracker();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showTelegramBanner, setShowTelegramBanner] = useState(true);
@@ -206,43 +197,98 @@ export default function App() {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/:lang" element={<Home />} />
+
               <Route path="/login" element={<Login />} />
+              <Route path="/:lang/login" element={<Login />} />
+
               <Route path="/register" element={<Register />} />
+              <Route path="/:lang/register" element={<Register />} />
+
               <Route path="/anime/:slug" element={<AnimeDetails />} />
+              <Route path="/:lang/anime/:slug" element={<AnimeDetails />} />
+
               <Route path="/admin" element={
                 <AdminPasscodeGate>
                   <Admin />
                 </AdminPasscodeGate>
               } />
+              <Route path="/:lang/admin" element={
+                <AdminPasscodeGate>
+                  <Admin />
+                </AdminPasscodeGate>
+              } />
+
               <Route path="/chat" element={<Chat />} />
+              <Route path="/:lang/chat" element={<Chat />} />
               
               {/* Added high fidelity views matching user design */}
               <Route path="/animelar" element={<Animelar />} />
+              <Route path="/:lang/animelar" element={<Animelar />} />
+
               <Route path="/manga" element={<Mangalar />} />
+              <Route path="/:lang/manga" element={<Mangalar />} />
               <Route path="/mangalar" element={<Navigate to="/manga" replace />} />
+              <Route path="/:lang/mangalar" element={<Navigate to="/manga" replace />} />
+
               <Route path="/manga/:id" element={<MangaDetails />} />
+              <Route path="/:lang/manga/:id" element={<MangaDetails />} />
+
               <Route path="/manga/:id/read/:chapterNumber" element={<MangaReader />} />
+              <Route path="/:lang/manga/:id/read/:chapterNumber" element={<MangaReader />} />
+
               <Route path="/jadval" element={<Jadval />} />
+              <Route path="/:lang/jadval" element={<Jadval />} />
+
               <Route path="/yangi-chiqishlar" element={<YangiChiqishlar />} />
+              <Route path="/:lang/yangi-chiqishlar" element={<YangiChiqishlar />} />
+
               <Route path="/top100" element={<Top100 />} />
+              <Route path="/:lang/top100" element={<Top100 />} />
+
               <Route path="/sevimlilar" element={<Sevimlilar />} />
+              <Route path="/:lang/sevimlilar" element={<Sevimlilar />} />
+
               <Route path="/shaxsiy-royxat" element={<ShaxsiyRoyxat />} />
+              <Route path="/:lang/shaxsiy-royxat" element={<ShaxsiyRoyxat />} />
               <Route path="/my-list" element={<Navigate to="/shaxsiy-royxat" replace />} />
+              <Route path="/:lang/my-list" element={<Navigate to="/shaxsiy-royxat" replace />} />
+
               <Route path="/tarix" element={<Tarix />} />
+              <Route path="/:lang/tarix" element={<Tarix />} />
+
               <Route path="/sozlamalar" element={<Sozlamalar />} />
+              <Route path="/:lang/sozlamalar" element={<Sozlamalar />} />
+
               <Route path="/profil" element={<Profil />} />
+              <Route path="/:lang/profil" element={<Profil />} />
+
               <Route path="/user/:id" element={<Profil />} />
+              <Route path="/:lang/user/:id" element={<Profil />} />
+
               <Route path="/donat" element={<Donat />} />
+              <Route path="/:lang/donat" element={<Donat />} />
               
               {/* Legal & Moderation Compliance Routes */}
               <Route path="/maxfiylik-siyosati" element={<PrivacyPolicy />} />
+              <Route path="/:lang/maxfiylik-siyosati" element={<PrivacyPolicy />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/:lang/privacy" element={<PrivacyPolicy />} />
+
               <Route path="/foydalanish-shartlari" element={<TermsOfService />} />
+              <Route path="/:lang/foydalanish-shartlari" element={<TermsOfService />} />
               <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/:lang/terms" element={<TermsOfService />} />
+
               <Route path="/mualliflik-huquqi" element={<DMCA />} />
+              <Route path="/:lang/mualliflik-huquqi" element={<DMCA />} />
               <Route path="/dmca" element={<DMCA />} />
+              <Route path="/:lang/dmca" element={<DMCA />} />
+
               <Route path="/aloqa" element={<Aloqa />} />
+              <Route path="/:lang/aloqa" element={<Aloqa />} />
               <Route path="/contacts" element={<Aloqa />} />
+              <Route path="/:lang/contacts" element={<Aloqa />} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -5,6 +5,7 @@ import { Star, Play, Grid, List, Film, Eye, Search, X, ChevronDown } from 'lucid
 import { motion } from 'motion/react';
 import AnimeCard from '../components/AnimeCard';
 import AdBanner728x90 from '../components/AdBanner728x90';
+import LoadingScreen from '../components/LoadingScreen';
 
 // Calculate responsive batch size (approx. 2.5 - 3 rows depending on device)
 const getBatchSize = () => {
@@ -155,11 +156,7 @@ export default function Animelar() {
   const hasMore = visibleCount < filteredAnimes.length;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-10 h-10 border-4 border-[#ff006a] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingScreen size="lg" />;
   }
 
   return (

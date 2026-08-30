@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import './index.css';
 import { AuthProvider } from './context/AuthContext.tsx';
+import { LanguageProvider } from './context/LanguageContext.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 
 // TV & Safe Storage theme check
@@ -34,7 +35,9 @@ if (rootElement) {
       <ErrorBoundary>
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <LanguageProvider>
+              <App />
+            </LanguageProvider>
           </AuthProvider>
         </BrowserRouter>
       </ErrorBoundary>

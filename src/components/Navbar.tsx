@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Notification, Anime, toSlug } from '../types';
-import { Search, LogOut, User, Bell, Menu, PlusCircle, Heart, Bookmark, Settings, X, Shield, Star, Film, Sparkles, Check } from 'lucide-react';
+import { Search, LogOut, User, Bell, Menu, PlusCircle, Heart, Bookmark, Settings, X, Shield, Star, Film, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   getNotificationPermission, 
   requestNotificationPermission, 
-  checkAndNotifyNewContent, 
-  sendDeviceNotification 
+  checkAndNotifyNewContent
 } from '../services/notificationService';
+import { Language } from '../i18n/translations';
+
 const logoImg = "https://files.catbox.moe/45hoi6.png";
 
 interface NavbarProps {
@@ -18,10 +20,12 @@ interface NavbarProps {
 
 export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const { user, logout } = useAuth();
+  const { language, setLanguage, t, getLocalizedPath } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchValue, setSearchValue] = useState(searchParams.get('search') || '');
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [allAnimes, setAllAnimes] = useState<Anime[]>([]);
@@ -53,9 +57,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
           }
         }
       } catch (err: any) {
-        if (err.name !== 'AbortError') {
-          // Ignore transient fetch errors
-        }
+        if (err.name !== 'AbortError') {}
       }
     };
 
@@ -84,6 +86,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
   }, []);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +99,9 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowProfileDropdown(false);
+      }
+      if (langRef.current && !langRef.current.contains(event.target as Node)) {
+        setShowLangDropdown(false);
       }
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
@@ -125,18 +131,25 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
     if (e) e.preventDefault();
     setIsSearchFocused(false);
     setShowMobileSearch(false);
+    const targetBase = getLocalizedPath('/animelar');
     if (searchValue.trim()) {
-      navigate(`/animelar?search=${encodeURIComponent(searchValue.trim())}`);
+      navigate(`${targetBase}?search=${encodeURIComponent(searchValue.trim())}`);
     } else {
-      navigate('/animelar');
+      navigate(targetBase);
     }
   };
 
   const handleLogout = () => {
     logout();
     setShowProfileDropdown(false);
-    navigate('/');
+    navigate(getLocalizedPath('/'));
   };
+
+  const languagesList: { code: Language; label: string; flag: string }[] = [
+    { code: 'uz', label: "O'zbekcha", flag: "🇺🇿" },
+    { code: 'ru', label: "Русский", flag: "🇷🇺" },
+    { code: 'ing', label: "English", flag: "🇬🇧" }
+  ];
 
   return (
     <header className="fixed top-0 right-0 left-0 md:left-64 h-16 md:h-16 bg-[#09090b]/95 backdrop-blur-md border-b border-[#1a1a1c] z-30 px-2 min-[400px]:px-4 md:px-8 flex items-center justify-between text-white select-none">
@@ -154,7 +167,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
               <button
                 type="button"
                 onClick={() => setShowMobileSearch(false)}
-                className="p-1.5 text-white/60 hover:text-white transition-colors"
+                className="p-1.5 text-white/60 hover:text-white transition-colors cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -164,10 +177,10 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                   autoFocus
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
-                  placeholder="Anime nomini yozing..."
+                  placeholder={t.searchPlaceholder}
                   className="w-full bg-[#111113] border border-[#ff006a]/40 text-white text-xs rounded-sm pl-4 pr-10 py-2.5 focus:outline-none focus:border-[#ff006a] transition-all placeholder:text-white/30 font-bold"
                 />
-                <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ff006a] hover:text-white transition-colors">
+                <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ff006a] hover:text-white transition-colors cursor-pointer">
                   <Search size={16} />
                 </button>
               </form>
@@ -179,14 +192,14 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                 {searchResults.length === 0 ? (
                   <div className="p-3 text-center text-xs text-white/40 flex items-center justify-center gap-2">
                     <Film size={14} />
-                    <span>Hech narsa topilmadi</span>
+                    <span>{t.notFound}</span>
                   </div>
                 ) : (
                   <>
                     {searchResults.slice(0, 5).map((anime) => (
                       <Link
                         key={anime.id}
-                        to={`/anime/${toSlug(anime.title)}`}
+                        to={getLocalizedPath(`/anime/${toSlug(anime.title)}`)}
                         onClick={() => {
                           setShowMobileSearch(false);
                           setIsSearchFocused(false);
@@ -214,9 +227,9 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                     ))}
                     <button
                       onClick={() => handleSearchSubmit()}
-                      className="w-full p-2.5 text-center text-xs font-bold text-[#ff006a] hover:bg-[#ff006a]/10 transition-colors bg-[#09090b]"
+                      className="w-full p-2.5 text-center text-xs font-bold text-[#ff006a] hover:bg-[#ff006a]/10 transition-colors bg-[#09090b] cursor-pointer"
                     >
-                      Barcha {searchResults.length} ta natijani ko'rish →
+                      {searchResults.length} {t.searchResults} →
                     </button>
                   </>
                 )}
@@ -231,13 +244,13 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
         {/* Hamburger Trigger for Mobile Sidebar */}
         <button
           onClick={onToggleSidebar}
-          className="p-1.5 -ml-1 text-white/70 hover:text-white hover:bg-[#1a1a1a] rounded-sm transition-colors md:hidden shrink-0"
+          className="p-1.5 -ml-1 text-white/70 hover:text-white hover:bg-[#1a1a1a] rounded-sm transition-colors md:hidden shrink-0 cursor-pointer"
         >
           <Menu size={18} />
         </button>
 
         {/* Mobile Brand Name */}
-        <Link to="/" className="flex items-center md:hidden shrink-0">
+        <Link to={getLocalizedPath('/')} className="flex items-center md:hidden shrink-0">
           <img 
             src={logoImg} 
             alt="AnimeUz" 
@@ -256,10 +269,10 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                 setSearchValue(e.target.value);
                 setIsSearchFocused(true);
               }}
-              placeholder="Anime qidirish..."
+              placeholder={t.searchPlaceholder}
               className="w-full bg-[#111113] border border-[#1a1a1c] text-white text-xs rounded-sm pl-4 pr-10 py-2.5 focus:outline-none focus:border-[#ff006a] transition-all placeholder:text-white/30 font-bold"
             />
-            <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-[#ff006a] transition-colors">
+            <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-[#ff006a] transition-colors cursor-pointer">
               <Search size={14} />
             </button>
           </form>
@@ -276,7 +289,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                 {searchResults.length === 0 ? (
                   <div className="p-4 text-center text-xs text-white/40 flex items-center justify-center gap-2">
                     <Film size={14} />
-                    <span>"{searchValue}" bo'yicha anime topilmadi</span>
+                    <span>"{searchValue}" bo'yicha hech narsa topilmadi</span>
                   </div>
                 ) : (
                   <>
@@ -284,7 +297,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                       {searchResults.slice(0, 6).map((anime) => (
                         <Link
                           key={anime.id}
-                          to={`/anime/${toSlug(anime.title)}`}
+                          to={getLocalizedPath(`/anime/${toSlug(anime.title)}`)}
                           onClick={() => setIsSearchFocused(false)}
                           className="p-2.5 flex items-center gap-3 hover:bg-[#1a1a1c] transition-colors group"
                         >
@@ -312,7 +325,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                     </div>
                     <button
                       onClick={() => handleSearchSubmit()}
-                      className="w-full p-2.5 text-center text-xs font-bold text-[#ff006a] hover:bg-[#ff006a]/10 transition-colors bg-[#0c0c0e] block"
+                      className="w-full p-2.5 text-center text-xs font-bold text-[#ff006a] hover:bg-[#ff006a]/10 transition-colors bg-[#0c0c0e] block cursor-pointer"
                     >
                       Barcha {searchResults.length} ta natijani ko'rish →
                     </button>
@@ -325,30 +338,74 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
       </div>
 
       {/* Right side: Actions & Profile */}
-      <div className="flex items-center space-x-1 min-[400px]:space-x-2 md:space-x-4 shrink-0">
+      <div className="flex items-center space-x-1 min-[400px]:space-x-2 md:space-x-3.5 shrink-0">
         
         {/* Mobile Search Icon */}
         <button 
           onClick={() => setShowMobileSearch(true)} 
-          className="p-1.5 text-white/60 hover:text-white transition-colors sm:hidden"
+          className="p-1.5 text-white/60 hover:text-white transition-colors sm:hidden cursor-pointer"
         >
           <Search size={16} />
         </button>
 
+        {/* Language Switcher Dropdown */}
+        <div className="relative" ref={langRef}>
+          <button
+            onClick={() => setShowLangDropdown(!showLangDropdown)}
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#ff006a]/40 text-xs font-bold text-white/80 transition-all cursor-pointer"
+            title="Tilni o'zgartirish"
+          >
+            <Globe size={14} className="text-[#ff006a]" />
+            <span className="uppercase text-[11px] font-black">{language}</span>
+          </button>
+
+          <AnimatePresence>
+            {showLangDropdown && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="absolute right-0 mt-2 w-36 bg-[#111113] border border-[#222] rounded-xl shadow-2xl overflow-hidden z-50 p-1 divide-y divide-[#1a1a1c]"
+              >
+                {languagesList.map((item) => (
+                  <button
+                    key={item.code}
+                    onClick={() => {
+                      setLanguage(item.code, true);
+                      setShowLangDropdown(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                      language === item.code 
+                        ? 'bg-[#ff006a]/20 text-[#ff006a]' 
+                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{item.flag}</span>
+                      <span>{item.label}</span>
+                    </span>
+                    {language === item.code && <span className="w-1.5 h-1.5 bg-[#ff006a] rounded-full" />}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Donat Quick Button */}
         <Link
-          to="/donat"
+          to={getLocalizedPath('/donat')}
           className="flex items-center gap-1.5 bg-[#ff006a]/15 hover:bg-[#ff006a] text-[#ff006a] hover:text-white border border-[#ff006a]/30 px-2.5 py-1.5 rounded-sm text-[11px] font-bold transition-all shadow-[0_0_10px_rgba(255,0,106,0.15)] uppercase tracking-wider shrink-0"
           title="Loyiha rivojiga donat qilish"
         >
           <Heart size={13} className="fill-current animate-pulse" />
-          <span className="hidden sm:inline">Donat</span>
+          <span className="hidden sm:inline">{t.navDonat}</span>
         </Link>
 
-        {/* Upload/Add Anime Quick-link (Admins or generic) */}
+        {/* Upload/Add Anime Quick-link (Admins only) */}
         {user?.role === 'admin' && (
           <Link
-            to="/admin"
+            to={getLocalizedPath('/admin')}
             className="p-2 text-white/60 hover:text-[#ff006a] hover:bg-[#111] rounded-sm transition-all"
             title="Katalog boshqaruvi"
           >
@@ -368,7 +425,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                 localStorage.setItem('last_read_notif_id', String(highestId));
               }
             }}
-            className="p-1.5 sm:p-2 text-white/60 hover:text-white hover:bg-[#111] rounded-sm transition-all relative"
+            className="p-1.5 sm:p-2 text-white/60 hover:text-white hover:bg-[#111] rounded-sm transition-all relative cursor-pointer"
           >
             <Bell size={16} />
             {notifCount > 0 && (
@@ -387,8 +444,8 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                 className="fixed sm:absolute top-16 sm:top-auto right-2 sm:right-0 left-2 sm:left-auto mt-1 sm:mt-3 w-auto sm:w-80 bg-[#111113] border border-[#1a1a1c] rounded-sm shadow-2xl overflow-hidden text-sm z-50"
               >
                 <div className="p-3 border-b border-[#222] bg-[#0c0c0e] flex items-center justify-between">
-                  <span className="font-bold text-xs uppercase tracking-wider text-white/50">Bildirishnomalar</span>
-                  <button onClick={() => setShowNotifications(false)} className="text-white/30 hover:text-white">
+                  <span className="font-bold text-xs uppercase tracking-wider text-white/50">{t.notificationsTitle}</span>
+                  <button onClick={() => setShowNotifications(false)} className="text-white/30 hover:text-white cursor-pointer">
                     <X size={12} />
                   </button>
                 </div>
@@ -398,7 +455,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                   <div className="p-2.5 bg-[#ff006a]/10 border-b border-[#ff006a]/20 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <Bell className="w-3.5 h-3.5 text-[#ff006a] shrink-0 animate-pulse" />
-                      <span className="text-[11px] text-white/80 font-medium truncate">Yangi animelardan xabar olish</span>
+                      <span className="text-[11px] text-white/80 font-medium truncate">{t.pushNotificationsSubtitle}</span>
                     </div>
                     <button
                       onClick={async () => {
@@ -407,19 +464,19 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                       }}
                       className="px-2.5 py-1 bg-[#ff006a] hover:bg-[#e6005c] text-white text-[10px] font-bold rounded uppercase shrink-0 transition-all cursor-pointer"
                     >
-                      Yoqish
+                      {t.enableNotifications}
                     </button>
                   </div>
                 )}
                 <div className="divide-y divide-[#1a1a1c] max-h-72 overflow-y-auto custom-scrollbar">
                   {notifications.length === 0 ? (
-                    <div className="p-4 text-xs text-center text-white/40">Yangi bildirishnomalar yo'q.</div>
+                    <div className="p-4 text-xs text-center text-white/40">{t.noNotifications}</div>
                   ) : (
                     notifications.map((n) => (
                       <div key={n.id} className="p-3 hover:bg-[#161619] transition-colors cursor-pointer">
                         <p className="font-bold text-xs text-white/90">{n.message}</p>
                         <span className="text-[9px] text-[#ff006a] font-mono mt-1 block">
-                          {n.created_at ? new Date(n.created_at).toLocaleString('uz-UZ') : 'Yangi'}
+                          {n.created_at ? new Date(n.created_at).toLocaleString() : 'Yangi'}
                         </span>
                       </div>
                     ))
@@ -435,7 +492,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-              className="flex items-center space-x-2 p-1 rounded-sm hover:bg-[#111] transition-all"
+              className="flex items-center space-x-2 p-1 rounded-sm hover:bg-[#111] transition-all cursor-pointer"
             >
               <div className="w-8 h-8 rounded-full border border-[#ff006a]/30 overflow-hidden flex items-center justify-center bg-[#1c1c1e] text-[#ff006a] uppercase font-bold text-xs">
                 {user.avatar_url ? (
@@ -461,40 +518,40 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                   </div>
                   <div className="p-1">
                     <Link
-                      to="/profil"
+                      to={getLocalizedPath('/profil')}
                       onClick={() => setShowProfileDropdown(false)}
                       className="flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white hover:bg-[#1a1a1c] rounded-sm transition-colors"
                     >
                       <User size={13} />
-                      <span>Mening profilim</span>
+                      <span>{t.myProfile}</span>
                     </Link>
                     <Link
-                      to="/shaxsiy-royxat"
+                      to={getLocalizedPath('/shaxsiy-royxat')}
                       onClick={() => setShowProfileDropdown(false)}
                       className="flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white hover:bg-[#1a1a1c] rounded-sm transition-colors"
                     >
                       <Bookmark size={13} className="text-[#ff006a]" />
-                      <span>Shaxsiy Ro'yxat</span>
+                      <span>{t.myList}</span>
                     </Link>
                     <Link
-                      to="/sevimlilar"
+                      to={getLocalizedPath('/sevimlilar')}
                       onClick={() => setShowProfileDropdown(false)}
                       className="flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white hover:bg-[#1a1a1c] rounded-sm transition-colors"
                     >
                       <Heart size={13} />
-                      <span>Sevimlilar</span>
+                      <span>{t.favorites}</span>
                     </Link>
                     <Link
-                      to="/sozlamalar"
+                      to={getLocalizedPath('/sozlamalar')}
                       onClick={() => setShowProfileDropdown(false)}
                       className="flex items-center space-x-2 px-3 py-2 text-white/70 hover:text-white hover:bg-[#1a1a1c] rounded-sm transition-colors"
                     >
                       <Settings size={13} />
-                      <span>Sozlamalar</span>
+                      <span>{t.settings}</span>
                     </Link>
                     {user.role === 'admin' && (
                       <Link
-                        to="/admin"
+                        to={getLocalizedPath('/admin')}
                         onClick={() => setShowProfileDropdown(false)}
                         className="flex items-center space-x-2 px-3 py-2 text-red-400 hover:bg-red-950/20 rounded-sm transition-colors"
                       >
@@ -506,10 +563,10 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                   <div className="p-1 border-t border-[#1a1a1c] bg-[#0c0c0e]">
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center space-x-2 px-3 py-2 text-white/50 hover:text-red-400 rounded-sm transition-colors text-left"
+                      className="w-full flex items-center space-x-2 px-3 py-2 text-white/50 hover:text-red-400 rounded-sm transition-colors text-left cursor-pointer"
                     >
                       <LogOut size={13} />
-                      <span>Chiqish</span>
+                      <span>{t.logout}</span>
                     </button>
                   </div>
                 </motion.div>
@@ -519,16 +576,16 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
         ) : (
           <div className="flex items-center space-x-1 min-[400px]:space-x-2">
             <Link 
-              to="/login" 
+              to={getLocalizedPath('/login')} 
               className="text-white/70 hover:text-white text-[11px] sm:text-xs font-bold px-2 sm:px-3 py-1.5 sm:py-2 transition-colors uppercase tracking-wider whitespace-nowrap"
             >
-              Kirish
+              {t.login}
             </Link>
             <Link 
-              to="/register" 
+              to={getLocalizedPath('/register')} 
               className="hidden min-[450px]:inline-flex bg-[#ff006a] text-white px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-sm text-[11px] sm:text-xs font-bold hover:bg-[#d40058] transition-colors uppercase tracking-wider whitespace-nowrap shrink-0"
             >
-              Ro'yxatdan o'tish
+              {t.register}
             </Link>
           </div>
         )}

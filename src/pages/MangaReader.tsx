@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, BookOpen, Layers, Maximize2, RotateCcw, Share2, Check } from 'lucide-react';
+import LoadingScreen from '../components/LoadingScreen';
 
 interface ChapterData {
   chapter: {
@@ -73,12 +74,7 @@ export default function MangaReader() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-3">
-        <div className="w-10 h-10 border-3 border-[#ff006a] border-t-transparent rounded-full animate-spin" />
-        <p className="text-white/60 text-xs font-bold uppercase tracking-wider">Sahifalar yuklanmoqda...</p>
-      </div>
-    );
+    return <LoadingScreen size="lg" text="Sahifalar yuklanmoqda..." />;
   }
 
   if (error || !data) {

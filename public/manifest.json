@@ -9,6 +9,12 @@
   "orientation": "portrait-primary",
   "icons": [
     {
+      "src": "https://api.animem.uz/api/images/1788100529230_au9wggu",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
       "src": "/icon-48.png",
       "sizes": "48x48",
       "type": "image/png",

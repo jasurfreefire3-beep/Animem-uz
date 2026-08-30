@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Home, Film, BookOpen, Search, User, X, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Anime, toSlug } from '../types';
@@ -9,6 +10,7 @@ export default function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t, getLocalizedPath } = useLanguage();
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [allAnimes, setAllAnimes] = useState<Anime[]>([]);
@@ -43,35 +45,37 @@ export default function MobileBottomNav() {
     if (e) e.preventDefault();
     if (searchQuery.trim()) {
       setShowSearchModal(false);
-      navigate(`/animelar?search=${encodeURIComponent(searchQuery.trim())}`);
+      navigate(`${getLocalizedPath('/animelar')}?search=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
+
+  const rawPath = location.pathname.replace(/^\/(uz|ru|ing|en)(\/|$)/, '/');
 
   const navItems = [
     {
       id: 'home',
-      label: 'Bosh sahifa',
-      path: '/',
+      label: t.navHome,
+      path: getLocalizedPath('/'),
       icon: Home,
-      isActive: location.pathname === '/'
+      isActive: rawPath === '/' || rawPath === ''
     },
     {
       id: 'animelar',
-      label: 'Animelar',
-      path: '/animelar',
+      label: t.navAnimes,
+      path: getLocalizedPath('/animelar'),
       icon: Film,
-      isActive: location.pathname.startsWith('/animelar') || location.pathname.startsWith('/anime/')
+      isActive: rawPath.startsWith('/animelar') || rawPath.startsWith('/anime/')
     },
     {
       id: 'mangalar',
-      label: 'Mangalar',
-      path: '/manga',
+      label: t.navManga,
+      path: getLocalizedPath('/manga'),
       icon: BookOpen,
-      isActive: location.pathname.startsWith('/manga')
+      isActive: rawPath.startsWith('/manga')
     },
     {
       id: 'qidiruv',
-      label: 'Qidiruv',
+      label: t.search,
       icon: Search,
       isAction: true,
       onClick: () => setShowSearchModal(true),
@@ -79,10 +83,10 @@ export default function MobileBottomNav() {
     },
     {
       id: 'profil',
-      label: 'Profil',
-      path: user ? '/profil' : '/login',
+      label: user ? t.myProfile : t.login,
+      path: user ? getLocalizedPath('/profil') : getLocalizedPath('/login'),
       icon: User,
-      isActive: location.pathname === '/profil' || location.pathname === '/login' || location.pathname === '/register'
+      isActive: rawPath === '/profil' || rawPath === '/login' || rawPath === '/register'
     }
   ];
 
@@ -127,7 +131,7 @@ export default function MobileBottomNav() {
 
             if (item.isAction) {
               return (
-                <button key={item.id} onClick={item.onClick} className="focus:outline-none">
+                <button key={item.id} onClick={item.onClick} className="focus:outline-none cursor-pointer">
                   {content}
                 </button>
               );
@@ -159,7 +163,7 @@ export default function MobileBottomNav() {
                   autoFocus
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Anime, manga yoki janr qidiring..."
+                  placeholder={t.searchPlaceholder}
                   className="w-full bg-[#121215] border border-[#ff006a]/50 text-white text-sm rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:border-[#ff006a] focus:ring-1 focus:ring-[#ff006a] transition-all font-bold placeholder:text-white/30"
                 />
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#ff006a]" />
@@ -167,7 +171,7 @@ export default function MobileBottomNav() {
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white cursor-pointer"
                   >
                     <X size={16} />
                   </button>
@@ -176,9 +180,9 @@ export default function MobileBottomNav() {
               <button
                 type="button"
                 onClick={() => setShowSearchModal(false)}
-                className="p-2 bg-[#18181c] border border-[#333] text-white rounded-xl font-bold text-xs hover:bg-[#222] transition-colors shrink-0"
+                className="p-2 bg-[#18181c] border border-[#333] text-white rounded-xl font-bold text-xs hover:bg-[#222] transition-colors shrink-0 cursor-pointer"
               >
-                Yopish
+                {t.close}
               </button>
             </div>
 
@@ -194,7 +198,7 @@ export default function MobileBottomNav() {
                     {searchResults.map((anime) => (
                       <Link
                         key={anime.id}
-                        to={`/anime/${toSlug(anime.title)}`}
+                        to={getLocalizedPath(`/anime/${toSlug(anime.title)}`)}
                         onClick={() => setShowSearchModal(false)}
                         className="flex items-center gap-3 p-2.5 bg-[#121215] border border-[#222] rounded-xl hover:border-[#ff006a]/50 transition-all active:scale-[0.98]"
                       >
@@ -219,7 +223,7 @@ export default function MobileBottomNav() {
                     ))}
                     <button
                       onClick={() => handleSearchSubmit()}
-                      className="w-full py-3 bg-[#ff006a] text-white rounded-xl font-bold text-xs uppercase tracking-wider text-center shadow-lg shadow-[#ff006a]/20 active:scale-95 transition-all mt-2"
+                      className="w-full py-3 bg-[#ff006a] text-white rounded-xl font-bold text-xs uppercase tracking-wider text-center shadow-lg shadow-[#ff006a]/20 active:scale-95 transition-all mt-2 cursor-pointer"
                     >
                       Barcha natijalarni ko'rish →
                     </button>
@@ -233,7 +237,7 @@ export default function MobileBottomNav() {
                       <button
                         key={term}
                         onClick={() => setSearchQuery(term)}
-                        className="px-3 py-1.5 bg-[#18181c] border border-[#2a2a30] text-white/80 hover:text-white hover:border-[#ff006a] rounded-lg text-xs font-semibold transition-all active:scale-95"
+                        className="px-3 py-1.5 bg-[#18181c] border border-[#2a2a30] text-white/80 hover:text-white hover:border-[#ff006a] rounded-lg text-xs font-semibold transition-all active:scale-95 cursor-pointer"
                       >
                         {term}
                       </button>

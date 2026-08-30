@@ -4,6 +4,7 @@ import { Anime, toSlug } from '../types';
 import { History, Trash2, Calendar, Star, Play, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
+import LoadingScreen from '../components/LoadingScreen';
 
 interface HistoryItem {
   animeId: string;
@@ -77,11 +78,7 @@ export default function Tarix() {
     .sort((a, b) => new Date(b.viewedAt).getTime() - new Date(a.viewedAt).getTime());
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-10 h-10 border-4 border-[#ff006a] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingScreen size="lg" />;
   }
 
   return (

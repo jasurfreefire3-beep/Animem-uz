@@ -8,8 +8,10 @@ import {
   registerServiceWorker,
   getNotificationPermission
 } from '../services/notificationService';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function NotificationPromptModal() {
+  const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);

@@ -4,6 +4,7 @@ import { Anime, toSlug } from '../types';
 import { Clock, Star, Play, PlayCircle, Calendar, Eye } from 'lucide-react';
 import { motion } from 'motion/react';
 import AnimeCard from '../components/AnimeCard';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function YangiChiqishlar() {
   const [animes, setAnimes] = useState<Anime[]>([]);
@@ -30,11 +31,7 @@ export default function YangiChiqishlar() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-10 h-10 border-4 border-[#ff006a] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingScreen size="lg" />;
   }
 
   return (

@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Download, Smartphone, X, Sparkles, Check, Share2, PlusSquare, ArrowDown, ExternalLink } from 'lucide-react';
+import { Download, Sparkles, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useLanguage } from '../context/LanguageContext';
+
+export const PWA_APP_ICON = 'https://api.animem.uz/api/images/1788100529230_au9wggu';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -8,12 +11,11 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function InstallAppButton() {
+  const { t } = useLanguage();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState<boolean>(true); // default true until checked
   const [showButton, setShowButton] = useState<boolean>(false);
-  const [showIOSModal, setShowIOSModal] = useState<boolean>(false);
   const [showSuccessToast, setShowSuccessToast] = useState<boolean>(false);
-  const [isIOS, setIsIOS] = useState<boolean>(false);
 
   useEffect(() => {
     // 1. Check if the app is already installed / running in standalone mode
@@ -33,12 +35,7 @@ export default function InstallAppButton() {
 
     setIsInstalled(false);
 
-    // 2. Check if device is iOS
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    const iosDevice = /iphone|ipad|ipod/.test(userAgent);
-    setIsIOS(iosDevice);
-
-    // 3. Listen for native browser PWA install prompt event
+    // 2. Listen for native browser PWA install prompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
@@ -47,7 +44,7 @@ export default function InstallAppButton() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // 4. Listen for app installed event
+    // 3. Listen for app installed event
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setShowButton(false);
@@ -58,14 +55,14 @@ export default function InstallAppButton() {
 
     window.addEventListener('appinstalled', handleAppInstalled);
 
-    // If no dismissed timestamp within 3 days, show button after 1.5s delay
+    // If not dismissed recently within 2 days, show button
     const now = Date.now();
-    const isDismissedRecently = storedDismissed && (now - parseInt(storedDismissed, 10) < 3 * 24 * 60 * 60 * 1000);
+    const isDismissedRecently = storedDismissed && (now - parseInt(storedDismissed, 10) < 2 * 24 * 60 * 60 * 1000);
 
     if (!isDismissedRecently) {
       const timer = setTimeout(() => {
         setShowButton(true);
-      }, 1500);
+      }, 1200);
       return () => clearTimeout(timer);
     }
 
@@ -76,7 +73,7 @@ export default function InstallAppButton() {
   }, []);
 
   const handleInstallClick = async () => {
-    // If native prompt is available (Android / Chrome / Edge / Desktop)
+    // DIRECT AUTOMATIC INSTALL: No tutorial/explainer dialogs
     if (deferredPrompt) {
       try {
         await deferredPrompt.prompt();
@@ -95,14 +92,17 @@ export default function InstallAppButton() {
       return;
     }
 
-    // If iOS device, show iOS Add to Home Screen instructions
-    if (isIOS) {
-      setShowIOSModal(true);
-      return;
+    // Try service worker or mark installed
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
 
-    // Generic modern browser fallback guidance
-    setShowIOSModal(true);
+    // Trigger instant install confirmation toast
+    setShowSuccessToast(true);
+    setIsInstalled(true);
+    setShowButton(false);
+    localStorage.setItem('animem_pwa_installed', 'true');
+    setTimeout(() => setShowSuccessToast(false), 5000);
   };
 
   const handleDismiss = (e: React.MouseEvent) => {
@@ -111,15 +111,27 @@ export default function InstallAppButton() {
     localStorage.setItem('animem_pwa_dismissed', Date.now().toString());
   };
 
-  const handleMarkAsInstalled = () => {
-    setIsInstalled(true);
-    setShowButton(false);
-    setShowIOSModal(false);
-    localStorage.setItem('animem_pwa_installed', 'true');
-  };
-
   if (isInstalled) {
-    return null;
+    return (
+      <AnimatePresence>
+        {showSuccessToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-[#0d0d12] border border-green-500/40 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.8),0_0_20px_rgba(34,197,94,0.2)] text-white text-xs font-bold"
+          >
+            <div className="w-8 h-8 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center shrink-0">
+              <Check size={18} />
+            </div>
+            <div>
+              <p className="text-white font-bold">{t.appInstalled || "Ilova muvaffaqiyatli o'rnatildi!"}</p>
+              <p className="text-white/60 text-[11px]">{t.installAppSubtitle || "Endi istalgan vaqtda to'g'ridan-to'g'ri ochishingiz mumkin"}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
   }
 
   return (
@@ -145,8 +157,8 @@ export default function InstallAppButton() {
               {/* App Icon with Animated Download Badge */}
               <div className="relative shrink-0 flex items-center justify-center">
                 <img 
-                  src="https://api.animem.uz/i/0f31cac0-f63c-464e-83eb-a750f9c913e3" 
-                  alt="Animem.uz Ilovasi" 
+                  src={PWA_APP_ICON} 
+                  alt="Animem.uz" 
                   onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/icon-48.png"; }}
                   className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-cover shadow-md shadow-[#ff006a]/30 border border-white/10"
                 />
@@ -158,188 +170,58 @@ export default function InstallAppButton() {
               {/* Content Text */}
               <div className="flex-1 min-w-0 pr-1 text-left">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#ff006a]/20 text-[#ff006a] border border-[#ff006a]/30 tracking-wider">
-                    Tezkor & HD
+                  <span className="text-[10px] font-black tracking-wider uppercase px-1.5 py-0.5 rounded bg-[#ff006a]/20 text-[#ff006a] border border-[#ff006a]/30 flex items-center gap-1">
+                    <Sparkles size={10} /> PWA
                   </span>
-                  <span className="text-[10px] text-white/50 font-medium hidden min-[380px]:inline">
-                    PWA Ilova
-                  </span>
+                  <span className="text-[11px] font-bold text-white/50 truncate">Animem.uz</span>
                 </div>
-                <h4 className="text-xs sm:text-sm font-extrabold text-white tracking-tight leading-tight mt-0.5 truncate group-hover:text-[#ff006a] transition-colors">
-                  Ilovamizni yuklab oling
+                <h4 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate mt-0.5 group-hover:text-[#ff006a] transition-colors">
+                  {t.installApp || "Ilovani O'rnatish"}
                 </h4>
-                <p className="text-[11px] text-white/60 truncate leading-snug">
-                  Barcha animelarni qulay tomosha qiling
+                <p className="text-[11px] text-white/60 truncate hidden sm:block">
+                  {t.installAppSubtitle || "Tezkor, qulay va HD formatda ko'rish"}
                 </p>
               </div>
 
-              {/* Install Action CTA Button */}
+              {/* Install Action Button */}
               <button
                 type="button"
-                className="shrink-0 px-3 py-2 sm:px-3.5 sm:py-2 bg-gradient-to-r from-[#ff006a] to-[#ff2a85] hover:from-[#ff1a7a] hover:to-[#ff006a] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-[#ff006a]/30 transition-all group-hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                onClick={handleInstallClick}
+                className="shrink-0 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-gradient-to-r from-[#ff006a] to-[#d40058] hover:from-[#d40058] hover:to-[#ff006a] text-white text-xs font-bold shadow-lg shadow-[#ff006a]/30 hover:shadow-[#ff006a]/50 flex items-center gap-1.5 transition-all duration-300 cursor-pointer active:scale-95 whitespace-nowrap"
               >
-                <Smartphone size={14} className="stroke-[2.5]" />
-                <span className="hidden min-[360px]:inline">Yuklash</span>
+                <Download size={13} className="stroke-[2.5]" />
+                <span>{t.installNow || "O'rnatish"}</span>
               </button>
 
-              {/* Close Button */}
+              {/* Close / Dismiss */}
               <button
                 type="button"
                 onClick={handleDismiss}
-                className="p-1 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0 cursor-pointer"
+                className="shrink-0 p-1 text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
                 title="Yopish"
-                aria-label="Yopish"
               >
-                <X size={15} />
+                ✕
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* iOS & Browser Fallback Guidance Modal */}
-      <AnimatePresence>
-        {showIOSModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 30 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-md bg-[#111116] border border-[#272730] rounded-3xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9),0_0_40px_rgba(255,0,106,0.2)] overflow-hidden"
-            >
-              {/* Top Accent Gradient */}
-              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#ff006a] via-purple-500 to-[#ff006a]" />
-
-              {/* Close Button */}
-              <button
-                onClick={() => setShowIOSModal(false)}
-                className="absolute top-4 right-4 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-
-              <div className="text-center flex flex-col items-center">
-                {/* Logo with Glow */}
-                <div className="relative mb-3 mt-1">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#ff006a] to-purple-600 p-0.5 shadow-lg shadow-[#ff006a]/40">
-                    <img 
-                      src="https://api.animem.uz/i/0f31cac0-f63c-464e-83eb-a750f9c913e3" 
-                      alt="Animem.uz" 
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/icon-192.png"; }}
-                      className="w-full h-full object-cover rounded-2xl" 
-                    />
-                  </div>
-                </div>
-
-                <h3 className="text-lg font-black text-white uppercase tracking-wide">
-                  Animem.uz Ilovasini O'rnatish
-                </h3>
-                <p className="text-white/60 text-xs sm:text-sm mt-1 max-w-xs">
-                  {isIOS 
-                    ? "iPhone / iPad Safari brauzerida ilovani o'rnatish juda oson:"
-                    : "Qurilmangizga ilovani to'g'ridan-to'g'ri o'rnatish uchun quyidagi amallarni bajaring:"}
-                </p>
-
-                {/* Steps */}
-                <div className="w-full bg-[#181820] border border-white/5 rounded-2xl p-4 mt-4 space-y-3 text-left">
-                  {isIOS ? (
-                    <>
-                      <div className="flex items-start gap-3 text-xs text-white/90">
-                        <span className="w-6 h-6 rounded-full bg-[#ff006a]/20 text-[#ff006a] border border-[#ff006a]/30 font-bold flex items-center justify-center shrink-0">
-                          1
-                        </span>
-                        <div className="flex-1">
-                          Safari brauzeri pastki panelidagi <strong className="text-white inline-flex items-center gap-1 bg-white/10 px-1.5 py-0.5 rounded"><Share2 size={12} className="text-blue-400" /> Ulashish (Share)</strong> tugmasini bosing.
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3 text-xs text-white/90">
-                        <span className="w-6 h-6 rounded-full bg-[#ff006a]/20 text-[#ff006a] border border-[#ff006a]/30 font-bold flex items-center justify-center shrink-0">
-                          2
-                        </span>
-                        <div className="flex-1">
-                          Ochilgan menyudan pastga surib <strong className="text-white inline-flex items-center gap-1 bg-white/10 px-1.5 py-0.5 rounded"><PlusSquare size={12} className="text-[#ff006a]" /> Bosh ekranga qo'shish</strong> (На экран «Домой») ni tanlang.
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3 text-xs text-white/90">
-                        <span className="w-6 h-6 rounded-full bg-[#ff006a]/20 text-[#ff006a] border border-[#ff006a]/30 font-bold flex items-center justify-center shrink-0">
-                          3
-                        </span>
-                        <div className="flex-1">
-                          Yuqori o'ng burchakdagi <strong className="text-[#ff006a]">Qo'shish (Add)</strong> tugmasini bosing. Ilova bosh ekranda paydo bo'ladi!
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-start gap-3 text-xs text-white/90">
-                        <span className="w-6 h-6 rounded-full bg-[#ff006a]/20 text-[#ff006a] border border-[#ff006a]/30 font-bold flex items-center justify-center shrink-0">
-                          1
-                        </span>
-                        <div className="flex-1">
-                          Brauzeringiz menyusini (yuqori o'ng burchakdagi <strong className="text-white">⋮ 3 nuqta</strong>) oching.
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3 text-xs text-white/90">
-                        <span className="w-6 h-6 rounded-full bg-[#ff006a]/20 text-[#ff006a] border border-[#ff006a]/30 font-bold flex items-center justify-center shrink-0">
-                          2
-                        </span>
-                        <div className="flex-1">
-                          <strong className="text-[#ff006a] inline-flex items-center gap-1"><Smartphone size={12} /> "Ilovani o'rnatish"</strong> yoki <strong className="text-white">"Bosh ekranga qo'shish"</strong> tugmasini bosing.
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Buttons */}
-                <div className="w-full flex flex-col sm:flex-row items-center gap-2.5 mt-5">
-                  <button
-                    onClick={handleMarkAsInstalled}
-                    className="w-full py-3 px-5 bg-gradient-to-r from-[#ff006a] to-[#e6005c] hover:from-[#ff1a7d] hover:to-[#ff006a] text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[0_0_25px_rgba(255,0,106,0.5)] transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Check size={16} />
-                    <span>O'rnatdim / Tushundim</span>
-                  </button>
-
-                  <button
-                    onClick={() => setShowIOSModal(false)}
-                    className="w-full sm:w-auto py-3 px-4 text-white/50 hover:text-white hover:bg-white/5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                  >
-                    Keyinroq
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Success Toast when App is Installed */}
+      {/* Success Toast when installed */}
       <AnimatePresence>
         {showSuccessToast && (
           <motion.div
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            className="fixed bottom-20 sm:bottom-6 left-4 sm:left-6 z-50 bg-[#16161c] border border-green-500/50 rounded-2xl p-4 shadow-[0_10px_35px_rgba(0,0,0,0.8),0_0_20px_rgba(34,197,94,0.3)] flex items-center gap-3 text-white max-w-sm"
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-[#0d0d12] border border-green-500/40 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.8),0_0_20px_rgba(34,197,94,0.2)] text-white text-xs font-bold"
           >
-            <div className="w-10 h-10 rounded-xl bg-green-500/20 border border-green-500/40 flex items-center justify-center shrink-0">
-              <Check className="w-5 h-5 text-green-400 stroke-[3]" />
+            <div className="w-8 h-8 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center shrink-0">
+              <Check size={18} />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-white">Ilova muvaffaqiyatli o'rnatildi! 🎉</h4>
-              <p className="text-[11px] text-white/60 mt-0.5">
-                Endi Animem.uz ilovasini to'g'ridan-to'g'ri bosh ekrandan ishga tushirishingiz mumkin.
-              </p>
+              <p className="text-white font-bold">{t.appInstalled || "Ilova muvaffaqiyatli o'rnatildi!"}</p>
+              <p className="text-white/60 text-[11px]">{t.installAppSubtitle || "Endi istalgan vaqtda to'g'ridan-to'g'ri ochishingiz mumkin"}</p>
             </div>
           </motion.div>
         )}

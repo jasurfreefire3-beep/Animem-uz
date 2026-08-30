@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Instagram, Youtube, ShieldCheck, FileText, Copyright, Mail, Tv, BookOpen, Flame, Calendar } from 'lucide-react';
 import AdBanner728x90 from './AdBanner728x90';
 import { TikTokIcon } from './SocialIcons';
+import { useLanguage } from '../context/LanguageContext';
 
 const TelegramIcon = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -17,6 +18,8 @@ const FacebookIcon = ({ className = "w-3.5 h-3.5" }: { className?: string }) => 
 );
 
 export default function Footer() {
+  const { t, getLocalizedPath } = useLanguage();
+
   return (
     <footer className="bg-[#0b0b0e] border-t border-[#1a1a20] text-white/70 pt-6 pb-20 md:pb-10 mt-16 font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -30,20 +33,20 @@ export default function Footer() {
           
           {/* Column 1: Brand & Intro */}
           <div className="space-y-4 md:col-span-1">
-            <Link to="/" className="flex items-center gap-2.5">
+            <Link to={getLocalizedPath('/')} className="flex items-center gap-2.5">
               <img loading="lazy" decoding="async" src="https://i.pinimg.com/736x/17/c6/88/17c688c6242fe4c3293be182924e73a3.jpg" alt="Animem.uz Logo" className="w-9 h-9 object-contain" />
               <span className="font-black text-xl tracking-wider text-white">
                 ANIMEM<span className="text-[#ff006a]">.UZ</span>
               </span>
             </Link>
             <p className="text-xs text-white/50 leading-relaxed">
-              O'zbekistondagi eng yirik va zamonaviy onlayn anime hamda manga portali. Sevimli animelaringizni HD formatda bepul tomosha qiling va mangalarni o'zbek tilida o'qing.
+              {t.footerDescription}
             </p>
 
             {/* Badges */}
             <div className="flex items-center gap-2 pt-1">
               <span className="px-2 py-0.5 bg-[#ff006a]/15 text-[#ff006a] border border-[#ff006a]/30 font-bold text-[10px] rounded">
-                16+ Yoshi cheklovi
+                16+
               </span>
               <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold text-[10px] rounded">
                 HD 1080p
@@ -57,27 +60,27 @@ export default function Footer() {
           {/* Column 2: Navigation */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider border-b border-[#222] pb-2">
-              Katalog va Bo'limlar
+              {t.footerCatalog}
             </h3>
             <ul className="space-y-2 text-xs">
               <li>
-                <Link to="/animelar" className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
-                  <Tv size={13} className="text-[#ff006a]" /> Barcha Animelar
+                <Link to={getLocalizedPath('/animelar')} className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
+                  <Tv size={13} className="text-[#ff006a]" /> {t.navAnimes}
                 </Link>
               </li>
               <li>
-                <Link to="/manga" className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
-                  <BookOpen size={13} className="text-[#ff006a]" /> Manga va Komikslar
+                <Link to={getLocalizedPath('/manga')} className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
+                  <BookOpen size={13} className="text-[#ff006a]" /> {t.navManga}
                 </Link>
               </li>
               <li>
-                <Link to="/top100" className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
-                  <Flame size={13} className="text-[#ff006a]" /> TOP-100 Animelar
+                <Link to={getLocalizedPath('/top100')} className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
+                  <Flame size={13} className="text-[#ff006a]" /> {t.navTop100}
                 </Link>
               </li>
               <li>
-                <Link to="/jadval" className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
-                  <Calendar size={13} className="text-[#ff006a]" /> Chiqish Jadvali
+                <Link to={getLocalizedPath('/jadval')} className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
+                  <Calendar size={13} className="text-[#ff006a]" /> {t.navSchedule}
                 </Link>
               </li>
             </ul>
@@ -86,27 +89,27 @@ export default function Footer() {
           {/* Column 3: Legal & Compliance */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider border-b border-[#222] pb-2">
-              Huquqiy Hujjatlar
+              {t.footerLegal}
             </h3>
             <ul className="space-y-2 text-xs">
               <li>
-                <Link to="/maxfiylik-siyosati" className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
-                  <ShieldCheck size={13} className="text-[#ff006a]" /> Maxfiylik Siyosati
+                <Link to={getLocalizedPath('/maxfiylik-siyosati')} className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
+                  <ShieldCheck size={13} className="text-[#ff006a]" /> {t.footerPrivacy}
                 </Link>
               </li>
               <li>
-                <Link to="/foydalanish-shartlari" className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
-                  <FileText size={13} className="text-[#ff006a]" /> Foydalanish Shartlari
+                <Link to={getLocalizedPath('/foydalanish-shartlari')} className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
+                  <FileText size={13} className="text-[#ff006a]" /> {t.footerTerms}
                 </Link>
               </li>
               <li>
-                <Link to="/mualliflik-huquqi" className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
-                  <Copyright size={13} className="text-[#ff006a]" /> Mualliflik Huquqi (DMCA)
+                <Link to={getLocalizedPath('/mualliflik-huquqi')} className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
+                  <Copyright size={13} className="text-[#ff006a]" /> {t.footerDmca}
                 </Link>
               </li>
               <li>
-                <Link to="/aloqa" className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
-                  <Mail size={13} className="text-[#ff006a]" /> Aloqa va Qayta Aloqa
+                <Link to={getLocalizedPath('/aloqa')} className="hover:text-[#ff006a] transition-colors flex items-center gap-2">
+                  <Mail size={13} className="text-[#ff006a]" /> {t.footerContacts}
                 </Link>
               </li>
             </ul>
@@ -115,11 +118,11 @@ export default function Footer() {
           {/* Column 4: Social & Support */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider border-b border-[#222] pb-2">
-              Ijtimoiy Tarmoqlar
+              {t.footerSocial}
             </h3>
 
             <p className="text-xs text-white/50">
-              Yangi fasllar va premeyralardan xabardor bo'lish uchun obuna bo'ling:
+              {t.footerSocialSubtitle}
             </p>
 
             <div className="flex flex-col gap-2 pt-1">
@@ -181,23 +184,23 @@ export default function Footer() {
         {/* Bottom Disclaimer & Copyright */}
         <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left text-[11px] text-white/40">
           <div>
-            © 2026 Animem.uz. Barcha huquqlar himoyalangan. Materiallardan nusxa ko'chirishda faol havola ko'rsatilishi shart.
+            {t.footerRights}
           </div>
 
           <div className="flex items-center gap-4">
-            <Link to="/maxfiylik-siyosati" className="hover:text-white transition-colors">
+            <Link to={getLocalizedPath('/maxfiylik-siyosati')} className="hover:text-white transition-colors">
               Privacy
             </Link>
             <span>•</span>
-            <Link to="/foydalanish-shartlari" className="hover:text-white transition-colors">
+            <Link to={getLocalizedPath('/foydalanish-shartlari')} className="hover:text-white transition-colors">
               Terms
             </Link>
             <span>•</span>
-            <Link to="/mualliflik-huquqi" className="hover:text-white transition-colors">
+            <Link to={getLocalizedPath('/mualliflik-huquqi')} className="hover:text-white transition-colors">
               DMCA
             </Link>
             <span>•</span>
-            <Link to="/aloqa" className="hover:text-white transition-colors">
+            <Link to={getLocalizedPath('/aloqa')} className="hover:text-white transition-colors">
               Contacts
             </Link>
           </div>
