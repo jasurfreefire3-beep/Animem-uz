@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Plus, Trash2, Edit2, Search, X, Check, Layers, Image, User, Sparkles, Link as LinkIcon } from 'lucide-react';
 import { Manga, MangaChapter } from '../types';
+import ImageUploader from './ImageUploader';
+import MangaPagesUploader from './MangaPagesUploader';
 
 interface AdminMangalarProps {
   token: string | null;
@@ -32,6 +34,7 @@ export default function AdminMangalar({ token }: AdminMangalarProps) {
   const [chapterNumber, setChapterNumber] = useState<string>('');
   const [chapterTitle, setChapterTitle] = useState<string>('');
   const [pagesInput, setPagesInput] = useState<string>('');
+  const [chapterPages, setChapterPages] = useState<string[]>([]);
   const [mangaChapters, setMangaChapters] = useState<MangaChapter[]>([]);
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | number | null>(null);
@@ -209,19 +212,16 @@ export default function AdminMangalar({ token }: AdminMangalarProps) {
     e.preventDefault();
     setMessage({ type: '', text: '' });
 
-    if (!selectedMangaId || !chapterNumber || !pagesInput.trim()) {
-      setMessage({ type: 'error', text: 'Manga, Bob raqami va rasm havolalarini kiritish majburiy!' });
-      return;
-    }
+    const finalPages = chapterPages.length > 0
+      ? chapterPages
+      : pagesInput
+          .split('\n')
+          .flatMap(line => line.split(','))
+          .map(line => line.trim())
+          .filter(line => line.length > 0);
 
-    // Split pages by line break or comma
-    const pagesArray = pagesInput
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
-
-    if (pagesArray.length === 0) {
-      setMessage({ type: 'error', text: 'Kamida 1 ta sahifa havolasi kiritilishi kerak!' });
+    if (!selectedMangaId || !chapterNumber || finalPages.length === 0) {
+      setMessage({ type: 'error', text: 'Manga, Bob raqami va kamida 1 ta sahifa rasmini kiritish majburiy!' });
       return;
     }
 
@@ -235,7 +235,7 @@ export default function AdminMangalar({ token }: AdminMangalarProps) {
         body: JSON.stringify({
           chapter_number: parseInt(chapterNumber),
           title: chapterTitle || `${chapterNumber}-bob`,
-          pages: pagesArray
+          pages: finalPages
         })
       });
 
@@ -248,6 +248,7 @@ export default function AdminMangalar({ token }: AdminMangalarProps) {
       setChapterNumber('');
       setChapterTitle('');
       setPagesInput('');
+      setChapterPages([]);
       fetchMangaDetails(selectedMangaId);
       fetchMangas();
     } catch (err: any) {
@@ -511,25 +512,25 @@ export default function AdminMangalar({ token }: AdminMangalarProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-white/70 mb-1 uppercase">Muqova Rasmi Havolasi (Cover URL) *</label>
-              <input
-                type="url"
+              <ImageUploader
+                label="Muqova Rasmi (Cover)"
                 required
                 value={coverUrl}
-                onChange={(e) => setCoverUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full bg-[#18181c] border border-[#333] rounded px-3 py-2 text-white text-xs focus:outline-none focus:border-[#ff006a]"
+                onChange={(url) => setCoverUrl(url)}
+                aspectRatio="poster"
+                placeholder="https://... yoki qurilmadan yuklang"
+                helpText="Manga asosiy vertikal muqovasi (MySQL bazasida saqlanadi)"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-white/70 mb-1 uppercase">Banner Rasmi Havolasi (Banner URL)</label>
-              <input
-                type="url"
+              <ImageUploader
+                label="Katta Banner Rasmi"
                 value={bannerUrl}
-                onChange={(e) => setBannerUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full bg-[#18181c] border border-[#333] rounded px-3 py-2 text-white text-xs focus:outline-none focus:border-[#ff006a]"
+                onChange={(url) => setBannerUrl(url)}
+                aspectRatio="banner"
+                placeholder="https://... yoki qurilmadan yuklang"
+                helpText="Manga tafsilotlari tepasidagi gorizontal banner (MySQL bazasida saqlanadi)"
               />
             </div>
 
@@ -676,20 +677,13 @@ export default function AdminMangalar({ token }: AdminMangalarProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-white/70 mb-1 uppercase">
-                Sahifa Rasm Havolalari (Har bir rasmni yangi qatordan yoki vergul bilan kiriting) *
-              </label>
-              <textarea
-                required
-                rows={6}
-                value={pagesInput}
-                onChange={(e) => setPagesInput(e.target.value)}
-                placeholder={"https://example.com/page1.jpg\nhttps://example.com/page2.jpg\nhttps://example.com/page3.jpg"}
-                className="w-full bg-[#18181c] border border-[#333] rounded p-3 text-white text-xs font-mono focus:outline-none focus:border-[#ff006a]"
+              <MangaPagesUploader
+                pages={chapterPages.length > 0 ? chapterPages : (pagesInput ? pagesInput.split('\n').flatMap(l => l.split(',')).map(l => l.trim()).filter(l => l.length > 0) : [])}
+                onChange={(pages) => {
+                  setChapterPages(pages);
+                  setPagesInput(pages.join('\n'));
+                }}
               />
-              <p className="text-[11px] text-white/40 mt-1">
-                Ushbu havolalar tartib bo'yicha ketma-ket o'quvchiga ko'rsatiladi.
-              </p>
             </div>
 
             <button

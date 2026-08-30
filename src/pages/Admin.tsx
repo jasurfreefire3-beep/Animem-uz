@@ -13,6 +13,7 @@ import AdminMangalar from '../components/AdminMangalar';
 import AdminDonatlar from '../components/AdminDonatlar';
 import AdminUsers from '../components/AdminUsers';
 import OnlineUsersTab from '../components/OnlineUsersTab';
+import ImageUploader from '../components/ImageUploader';
 
 export default function Admin() {
   const { user, token } = useAuth();
@@ -792,37 +793,29 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Poster Cover URL */}
+              {/* Poster Cover */}
               <div>
-                <label className="block text-xs font-bold text-white/50 mb-1.5 uppercase">Poster Rasm URL</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Image className="h-4 w-4 text-white/30" />
-                  </div>
-                  <input
-                    type="url"
-                    required
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className="w-full bg-[#000] border border-[#222] rounded-sm pl-10 pr-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:border-[#ff006a]/50 transition-colors"
-                  />
-                </div>
+                <ImageUploader
+                  label="Poster Rasm (Cover)"
+                  required
+                  value={imageUrl}
+                  onChange={(url) => setImageUrl(url)}
+                  aspectRatio="poster"
+                  placeholder="https://... yoki qurilmadan yuklang"
+                  helpText="Anime asosiy vertikal muqovasi (MySQL bazasida saqlanadi)"
+                />
               </div>
 
-              {/* Banner URL */}
+              {/* Banner */}
               <div>
-                <label className="block text-xs font-bold text-white/50 mb-1.5 uppercase">Katta Banner Rasm URL</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <LinkIcon className="h-4 w-4 text-white/30" />
-                  </div>
-                  <input
-                    type="url"
-                    value={bannerUrl}
-                    onChange={(e) => setBannerUrl(e.target.value)}
-                    className="w-full bg-[#000] border border-[#222] rounded-sm pl-10 pr-4 py-2.5 text-white placeholder-white/30 focus:outline-none focus:border-[#ff006a]/50 transition-colors"
-                  />
-                </div>
+                <ImageUploader
+                  label="Katta Banner Rasm"
+                  value={bannerUrl}
+                  onChange={(url) => setBannerUrl(url)}
+                  aspectRatio="banner"
+                  placeholder="https://... yoki qurilmadan yuklang"
+                  helpText="Anime bosh sahifasi va detallar tepasida chiqadigan gorizontal banner"
+                />
               </div>
               
               {/* Status */}

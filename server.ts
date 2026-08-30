@@ -613,7 +613,35 @@ async function testDbConnection() {
       console.warn("Messages table verification in MySQL notice:", e);
     }
 
-    console.log("Verified mangas, manga_chapters, comments and messages tables and columns in MySQL.");
+    // Ensure media_files table in MySQL (Stores images in DB directly without saving to disk)
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS media_files (
+          id VARCHAR(64) PRIMARY KEY,
+          filename VARCHAR(255) DEFAULT '',
+          mime_type VARCHAR(100) DEFAULT 'image/jpeg',
+          data LONGTEXT NOT NULL,
+          size INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
+      `);
+      console.log("Verified media_files table in MySQL.");
+    } catch (e) {
+      console.warn("media_files table creation warning:", e);
+    }
+
+    // Ensure animes and mangas image columns support large text / data
+    try {
+      await connection.query(`ALTER TABLE animes MODIFY COLUMN image_url LONGTEXT`);
+      await connection.query(`ALTER TABLE animes MODIFY COLUMN banner_url LONGTEXT`);
+    } catch (e) {}
+
+    try {
+      await connection.query(`ALTER TABLE mangas MODIFY COLUMN cover_url LONGTEXT`);
+      await connection.query(`ALTER TABLE mangas MODIFY COLUMN banner_url LONGTEXT`);
+    } catch (e) {}
+
+    console.log("Verified mangas, manga_chapters, comments, media_files and messages tables and columns in MySQL.");
 
     connection.release();
   } catch (err) {
@@ -2003,6 +2031,171 @@ app.get("/api/archive-config", authenticateToken, (req: any, res) => {
   } catch (err) {
     console.error("Get archive config error:", err);
     res.status(500).json({ error: "Serverda xatolik" });
+  }
+});
+
+// --- MySQL In-Memory Direct Media Storage (No Disk Writing) ---
+const memoryUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25 MB max per file
+  },
+});
+
+// High performance in-memory media cache to minimize DB load on frequent hits
+const mediaMemoryCache = new Map<string, { mimeType: string; base64: string; buffer: Buffer }>();
+
+// Upload single image from device directly into MySQL Database (NO DISK STORAGE)
+app.post("/api/media/upload", authenticateToken, memoryUpload.single("file"), async (req: any, res: any) => {
+  try {
+    let fileBuffer: Buffer | null = null;
+    let mimeType = "image/jpeg";
+    let filename = "image.jpg";
+    let fileSize = 0;
+
+    if (req.file) {
+      fileBuffer = req.file.buffer;
+      mimeType = req.file.mimetype || "image/jpeg";
+      filename = req.file.originalname || "image.jpg";
+      fileSize = req.file.size || fileBuffer.length;
+    } else if (req.body && req.body.base64) {
+      const b64Data = req.body.base64;
+      const match = b64Data.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        fileBuffer = Buffer.from(match[2], "base64");
+      } else {
+        fileBuffer = Buffer.from(b64Data, "base64");
+      }
+      filename = req.body.filename || "image.jpg";
+      fileSize = fileBuffer.length;
+    }
+
+    if (!fileBuffer || fileBuffer.length === 0) {
+      return res.status(400).json({ error: "Rasm fayli tanlanmadi yoki bo'sh" });
+    }
+
+    const base64String = fileBuffer.toString("base64");
+    const mediaId = "img_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+
+    // Save directly into MySQL database (media_files table) - no disk involved
+    try {
+      await dbQuery(
+        `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?)`,
+        [mediaId, filename, mimeType, base64String, fileSize]
+      );
+      console.log(`[MySQL DB] Stored media image #${mediaId} (${filename}, ${fileSize} bytes) into database`);
+    } catch (dbErr) {
+      console.error("[MySQL DB] Failed to insert media into database:", dbErr);
+    }
+
+    // Keep in RAM cache for fast serving
+    mediaMemoryCache.set(mediaId, { mimeType, base64: base64String, buffer: fileBuffer });
+    if (mediaMemoryCache.size > 300) {
+      const firstKey = mediaMemoryCache.keys().next().value;
+      if (firstKey) mediaMemoryCache.delete(firstKey);
+    }
+
+    const mediaUrl = `/api/media/${mediaId}`;
+    return res.status(201).json({
+      success: true,
+      id: mediaId,
+      url: mediaUrl,
+      filename,
+      size: fileSize,
+      mime_type: mimeType
+    });
+  } catch (err: any) {
+    console.error("Media upload to MySQL error:", err);
+    return res.status(500).json({ error: "Rasmni MySQL bazasiga yuklashda xatolik yuz berdi" });
+  }
+});
+
+// Upload multiple images from device directly into MySQL Database (e.g. Manga Chapter Pages)
+app.post("/api/media/upload-multiple", authenticateToken, memoryUpload.array("files", 60), async (req: any, res: any) => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "Hech qanday rasm fayllari tanlanmadi" });
+    }
+
+    const results = [];
+    for (const file of files) {
+      const fileBuffer = file.buffer;
+      const mimeType = file.mimetype || "image/jpeg";
+      const filename = file.originalname || "image.jpg";
+      const fileSize = file.size || fileBuffer.length;
+      const base64String = fileBuffer.toString("base64");
+      const mediaId = "img_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+
+      try {
+        await dbQuery(
+          `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?)`,
+          [mediaId, filename, mimeType, base64String, fileSize]
+        );
+      } catch (dbErr) {
+        console.error("[MySQL DB] Failed to save multiple media item to database:", dbErr);
+      }
+
+      mediaMemoryCache.set(mediaId, { mimeType, base64: base64String, buffer: fileBuffer });
+      results.push({
+        id: mediaId,
+        url: `/api/media/${mediaId}`,
+        filename,
+        size: fileSize
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      count: results.length,
+      files: results
+    });
+  } catch (err: any) {
+    console.error("Multiple media upload to MySQL error:", err);
+    return res.status(500).json({ error: "Rasmlarni MySQL bazasiga yuklashda xatolik" });
+  }
+});
+
+// Serve image directly from MySQL Database
+app.get("/api/media/:id", async (req: any, res: any) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).send("Media ID kiritilishi shart");
+
+    // 1. Check in-memory RAM cache first
+    if (mediaMemoryCache.has(id)) {
+      const cached = mediaMemoryCache.get(id)!;
+      res.setHeader("Content-Type", cached.mimeType || "image/jpeg");
+      res.setHeader("Content-Disposition", "inline");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(cached.buffer || Buffer.from(cached.base64, "base64"));
+    }
+
+    // 2. Query MySQL database
+    const [rows]: any = await dbQuery("SELECT mime_type, data FROM media_files WHERE id = ?", [id]);
+    if (!rows || rows.length === 0) {
+      return res.status(404).send("Rasm MySQL bazasidan topilmadi");
+    }
+
+    const row = rows[0];
+    const mimeType = row.mime_type || "image/jpeg";
+    const buffer = Buffer.from(row.data, "base64");
+
+    // Cache in RAM for subsequent queries
+    mediaMemoryCache.set(id, { mimeType, base64: row.data, buffer });
+    if (mediaMemoryCache.size > 300) {
+      const firstKey = mediaMemoryCache.keys().next().value;
+      if (firstKey) mediaMemoryCache.delete(firstKey);
+    }
+
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", "inline");
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return res.send(buffer);
+  } catch (err: any) {
+    console.error("Serve media from MySQL error:", err);
+    return res.status(500).send("Rasmni bazadan yuklab olishda xatolik");
   }
 });
 
