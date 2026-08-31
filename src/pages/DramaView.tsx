@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   Heart, Eye, Calendar, Film, Share2, MessageSquare, 
-  Send, Trash2, ThumbsUp, ThumbsDown, CornerDownRight, Check, ArrowLeft, Play
+  Send, Trash2, Check, ArrowLeft, Play, ListOrdered, Tv
 } from 'lucide-react';
-import { Drama, Comment } from '../types';
+import { Drama, DramaEpisode, Comment } from '../types';
 import { useAuth } from '../context/AuthContext';
 import DramaCard from '../components/DramaCard';
+import VideoPlayer from '../components/VideoPlayer';
 
 export default function DramaView() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +15,8 @@ export default function DramaView() {
   const { user, token } = useAuth();
 
   const [drama, setDrama] = useState<Drama | null>(null);
+  const [episodes, setEpisodes] = useState<DramaEpisode[]>([]);
+  const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [allDramas, setAllDramas] = useState<Drama[]>([]);
   const [likes, setLikes] = useState(0);
@@ -28,6 +31,7 @@ export default function DramaView() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    setCurrentEpisodeIndex(0);
     fetchDramaDetails();
     fetchComments();
     fetchAllDramas();
@@ -41,7 +45,18 @@ export default function DramaView() {
         const data: Drama = await res.json();
         setDrama(data);
         setLikes(data.likes || 0);
-        document.title = `${data.title} - Dramalar - Animem Uz`;
+
+        const dramaEps = data.episodes || [];
+        setEpisodes(dramaEps);
+        setCurrentEpisodeIndex(0);
+
+        document.title = `${data.title} - Koreys Drama O'zbek Tilida Ko'rish | Animem Uz`;
+        
+        // Update meta description
+        const metaDesc = document.querySelector('meta[name="description"]');
+        if (metaDesc) {
+          metaDesc.setAttribute('content', `${data.title} koreys dramasi o'zbek tilida bepul onlayn tomosha qilish. ${data.description ? data.description.substring(0, 160) : ''}`);
+        }
 
         // Check if liked
         const identifier = user ? `user_${user.id}` : null;
@@ -205,6 +220,9 @@ export default function DramaView() {
 
   const genresList = (drama.janrlar || '').split(',').map(s => s.trim()).filter(Boolean);
 
+  const currentEp = episodes[currentEpisodeIndex] || null;
+  const currentVideoUrl = currentEp?.video_url || drama.video_url || '';
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       {/* Back Button */}
@@ -219,36 +237,37 @@ export default function DramaView() {
 
       {/* Main Drama Header & Player Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left: Video Player or Banner */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="relative aspect-video w-full bg-black rounded-md overflow-hidden border border-[#222] shadow-2xl">
-            {drama.video_url ? (
-              drama.video_url.includes('<iframe') ? (
-                <div 
-                  className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full"
-                  dangerouslySetInnerHTML={{ __html: drama.video_url }}
-                />
-              ) : drama.video_url.includes('youtube.com') || drama.video_url.includes('youtu.be') ? (
-                <iframe
-                  src={drama.video_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
-                  className="w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : (
-                <video
-                  src={drama.video_url}
-                  controls
-                  poster={drama.banner_url || drama.poster_url}
-                  className="w-full h-full object-contain"
-                />
-              )
+        {/* Left: Video Player (PlayerJS) or Banner */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* Player Box */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Tv className="w-4 h-4 text-[#ff006a]" />
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                  {currentEp ? (currentEp.title || `${currentEp.qism}-Qism`) : '1-Qism'}
+                </h2>
+              </div>
+              {episodes.length > 1 && (
+                <span className="text-xs text-white/50 font-medium">
+                  {currentEpisodeIndex + 1} / {episodes.length} qismlar
+                </span>
+              )}
+            </div>
+
+            {currentVideoUrl ? (
+              <VideoPlayer 
+                url={currentVideoUrl} 
+                poster={drama.banner_url || drama.poster_url} 
+                animeTitle={`${drama.title} - ${currentEp ? (currentEp.title || `${currentEp.qism}-qism`) : '1-qism'}`} 
+              />
             ) : (
-              <div className="w-full h-full relative flex items-center justify-center">
+              <div className="relative aspect-video w-full bg-black rounded-md overflow-hidden border border-[#222] shadow-2xl flex items-center justify-center">
                 <img
                   src={drama.banner_url || drama.poster_url}
                   alt={drama.title}
-                  className="w-full h-full object-cover opacity-60"
+                  className="w-full h-full object-cover opacity-50"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                 <div className="relative z-10 text-center p-6">
@@ -256,11 +275,72 @@ export default function DramaView() {
                     <Play className="w-6 h-6 fill-current ml-1" />
                   </div>
                   <h3 className="text-lg font-bold text-white">{drama.title}</h3>
-                  <p className="text-xs text-white/60 mt-1">Tez orada onlayn tomosha uchun yangi qismlar joylanadi</p>
+                  <p className="text-xs text-white/60 mt-1">Tez orada yangi qismlar joylanadi</p>
                 </div>
               </div>
             )}
           </div>
+
+          {/* Telegram link if provided */}
+          {drama.telegram_url && (
+            <a
+              href={drama.telegram_url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 bg-[#0088cc]/10 hover:bg-[#0088cc]/20 border border-[#0088cc]/40 text-[#0088cc] rounded-sm text-xs font-bold transition-colors"
+            >
+              <img 
+                src="https://api.animem.uz/i/2f5df3e0-bd69-4fd4-b558-429a47091414" 
+                alt="Telegram" 
+                className="w-4 h-4 object-contain rounded-full" 
+              />
+              <span>Telegram Kanalida Ko'rish / Yuklab Olish</span>
+            </a>
+          )}
+
+          {/* Episodes List (Qismlar) */}
+          {episodes.length > 0 && (
+            <div className="bg-[#111] border border-[#222] rounded-md p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-[#222] pb-3">
+                <div className="flex items-center gap-2">
+                  <ListOrdered className="w-4 h-4 text-[#ff006a]" />
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Qismlar Ro'yxati ({episodes.length})
+                  </h3>
+                </div>
+                <span className="text-[11px] text-white/40 font-medium">
+                  Tomosha qilish uchun qismni tanlang
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                {episodes.map((ep, idx) => {
+                  const isCurrent = currentEpisodeIndex === idx;
+                  return (
+                    <button
+                      key={ep.id || idx}
+                      onClick={() => {
+                        setCurrentEpisodeIndex(idx);
+                        window.scrollTo({ top: 120, behavior: 'smooth' });
+                      }}
+                      className={`px-3 py-2.5 rounded-sm text-xs font-bold flex flex-col items-center justify-center border transition-all ${
+                        isCurrent
+                          ? 'bg-[#ff006a] border-[#ff006a] text-white shadow-lg shadow-[#ff006a]/25 scale-105'
+                          : 'bg-[#181818] border-[#252525] text-white/80 hover:bg-[#222] hover:text-white hover:border-[#333]'
+                      }`}
+                    >
+                      <span className="text-xs">{ep.qism}-qism</span>
+                      {ep.title && ep.title !== `${ep.qism}-Qism` && (
+                        <span className="text-[9px] opacity-60 truncate w-full text-center mt-0.5">
+                          {ep.title}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Action Bar (Like, Share, Views) */}
           <div className="bg-[#111] border border-[#222] rounded-md p-4 flex flex-wrap items-center justify-between gap-4">
@@ -269,7 +349,7 @@ export default function DramaView() {
               <button
                 onClick={handleToggleLike}
                 disabled={likeLoading}
-                className={`flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold transition-all ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold transition-all cursor-pointer ${
                   isLiked
                     ? 'bg-[#ff006a] text-white shadow-lg shadow-[#ff006a]/20 scale-105'
                     : 'bg-[#1a1a1a] text-white/80 hover:text-white hover:bg-[#252525]'
@@ -282,7 +362,7 @@ export default function DramaView() {
               {/* Share Button */}
               <button
                 onClick={handleShare}
-                className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] hover:bg-[#252525] text-white/80 hover:text-white rounded-sm text-xs font-bold transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] hover:bg-[#252525] text-white/80 hover:text-white rounded-sm text-xs font-bold transition-colors cursor-pointer"
               >
                 {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
                 <span>{copied ? 'Nusxalandi!' : 'Ulashish'}</span>
@@ -316,6 +396,9 @@ export default function DramaView() {
                     {drama.yil}
                   </span>
                   <span className="text-[11px] text-white/50">Drama</span>
+                  {episodes.length > 0 && (
+                    <span className="text-[11px] text-white/50">• {episodes.length} qism</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -340,28 +423,16 @@ export default function DramaView() {
             {drama.description && (
               <div>
                 <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">Drama Haqida</h4>
-                <p className="text-xs text-white/70 leading-relaxed max-h-48 overflow-y-auto pr-1">
+                <p className="text-xs text-white/70 leading-relaxed max-h-48 overflow-y-auto pr-1 whitespace-pre-line">
                   {drama.description}
                 </p>
               </div>
-            )}
-
-            {/* Telegram Link */}
-            {drama.telegram_url && (
-              <a
-                href={drama.telegram_url}
-                target="_blank"
-                rel="noreferrer"
-                className="block w-full text-center py-2.5 bg-[#229ED9]/10 hover:bg-[#229ED9]/20 border border-[#229ED9]/30 text-[#229ED9] rounded-sm text-xs font-bold transition-colors"
-              >
-                Telegram Kanalida Ko'rish
-              </a>
             )}
           </div>
         </div>
       </div>
 
-      {/* Comments Section */}
+      {/* Comments Section & Recommended */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[#111] border border-[#222] rounded-md p-6 space-y-6">
@@ -391,7 +462,7 @@ export default function DramaView() {
                 <button
                   type="submit"
                   disabled={!user || submittingComment || !commentContent.trim()}
-                  className="px-5 py-2 bg-[#ff006a] hover:bg-[#ff006a]/90 disabled:opacity-50 text-white text-xs font-bold rounded-sm flex items-center gap-2 transition-all uppercase tracking-wider"
+                  className="px-5 py-2 bg-[#ff006a] hover:bg-[#ff006a]/90 disabled:opacity-50 text-white text-xs font-bold rounded-sm flex items-center gap-2 transition-all uppercase tracking-wider cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" /> {submittingComment ? "Yuborilmoqda..." : "Fikr Qoldirish"}
                 </button>
@@ -428,7 +499,7 @@ export default function DramaView() {
                       {user && (user.role === 'admin' || user.id === comment.user_id) && (
                         <button
                           onClick={() => handleDeleteComment(comment.id)}
-                          className="text-white/30 hover:text-red-400 p-1 transition-colors"
+                          className="text-white/30 hover:text-red-400 p-1 transition-colors cursor-pointer"
                           title="Fikrni o'chirish"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

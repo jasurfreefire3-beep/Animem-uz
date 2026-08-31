@@ -5,6 +5,8 @@ User-agent: *
 Allow: /
 Allow: /anime/
 Allow: /manga/
+Allow: /drama/
+Allow: /dramalar
 Allow: /animelar
 Allow: /top100
 Allow: /jadval
@@ -24,6 +26,8 @@ User-agent: Googlebot
 Allow: /
 Allow: /anime/
 Allow: /manga/
+Allow: /drama/
+Allow: /dramalar
 Disallow: /admin
 Disallow: /profil
 Disallow: /sozlamalar
@@ -41,6 +45,8 @@ User-agent: Yandex
 Allow: /
 Allow: /anime/
 Allow: /manga/
+Allow: /drama/
+Allow: /dramalar
 Disallow: /admin
 Disallow: /profil
 Disallow: /sozlamalar
@@ -60,6 +66,8 @@ Allow: /*.webp$
 User-agent: YandexVideo
 Allow: /
 Allow: /anime/
+Allow: /drama/
+Allow: /dramalar
 
 User-agent: YandexBot
 Allow: /

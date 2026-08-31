@@ -109,6 +109,15 @@ export interface Comment {
   created_at: string;
 }
 
+export interface DramaEpisode {
+  id: string | number;
+  drama_id: string | number;
+  qism: number;
+  title?: string;
+  video_url: string;
+  created_at?: string;
+}
+
 export interface Drama {
   id: string | number;
   title: string;
@@ -122,6 +131,8 @@ export interface Drama {
   likes?: number;
   liked_users?: (string | number)[];
   korishlar?: number;
+  episodes?: DramaEpisode[];
+  episodes_count?: number;
   created_at?: string;
 }
 

@@ -282,6 +282,7 @@ function loadLocalStore() {
     if (!memoryLocalStore.mangas) memoryLocalStore.mangas = [];
     if (!memoryLocalStore.manga_chapters) memoryLocalStore.manga_chapters = [];
     if (!memoryLocalStore.dramas) memoryLocalStore.dramas = [];
+    if (!memoryLocalStore.drama_episodes) memoryLocalStore.drama_episodes = [];
     if (!memoryLocalStore.donations) memoryLocalStore.donations = [];
     return memoryLocalStore;
   } catch (e) {
@@ -657,6 +658,23 @@ async function testDbConnection() {
       console.log("Verified dramas table in MySQL.");
     } catch (e) {
       console.warn("dramas table creation warning:", e);
+    }
+
+    // Create drama_episodes table if not exists in MySQL
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS drama_episodes (
+          id BIGINT PRIMARY KEY,
+          drama_id BIGINT NOT NULL,
+          qism INT NOT NULL,
+          title VARCHAR(255),
+          video_url LONGTEXT NOT NULL,
+          created_at VARCHAR(255)
+        )
+      `);
+      console.log("Verified drama_episodes table in MySQL.");
+    } catch (e) {
+      console.warn("drama_episodes table creation warning:", e);
     }
 
     // Ensure messages table for chat
@@ -4565,65 +4583,6 @@ app.delete("/api/mangas/:mangaId/chapters/:chapterNumber", authenticateToken, as
 
 // ==================== DRAMA API ENDPOINTS ====================
 
-const DEFAULT_SEED_DRAMAS = [
-  {
-    id: 1001,
-    title: "Crash Landing on You",
-    description: "Janubiy Koreyalik merosxo'r qiz parashyutda uchish chog'ida bo'ron tufayli Shimoliy Koreyaga tushib qoladi va u yerda o'zini qutqargan ofitser bilan sevishib qoladi.",
-    poster_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600",
-    banner_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200",
-    janrlar: "Melodrama, Romantika, Komediya",
-    yil: 2020,
-    likes: 342,
-    liked_users: "[]",
-    korishlar: 1540,
-    video_url: "https://www.w3schools.com/html/mov_bbb.mp4",
-    created_at: new Date(Date.now() - 86400000 * 5).toISOString()
-  },
-  {
-    id: 1002,
-    title: "Vincenzo",
-    description: "Italiyalik maffiya konsiglerisi Vincenzo Cassano adolat o'rnatish va noqonuniy korporatsiyani yiqitish uchun Seulga qaytadi.",
-    poster_url: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600",
-    banner_url: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1200",
-    janrlar: "Jangari, Komediya, Jinoyat, Drama",
-    yil: 2021,
-    likes: 418,
-    liked_users: "[]",
-    korishlar: 2120,
-    video_url: "https://www.w3schools.com/html/mov_bbb.mp4",
-    created_at: new Date(Date.now() - 86400000 * 3).toISOString()
-  },
-  {
-    id: 1003,
-    title: "All of Us Are Dead",
-    description: "O'rta maktabda zombi virusi tarqalgach, omon qolgan o'quvchilar najotsiz holda o'z hayotlari uchun kurashishga majbur bo'ladilar.",
-    poster_url: "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=600",
-    banner_url: "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=1200",
-    janrlar: "Dahshatli, Drama, Jangari",
-    yil: 2022,
-    likes: 512,
-    liked_users: "[]",
-    korishlar: 3450,
-    video_url: "https://www.w3schools.com/html/mov_bbb.mp4",
-    created_at: new Date(Date.now() - 86400000 * 1).toISOString()
-  },
-  {
-    id: 1004,
-    title: "Goblin: The Lonely and Great God",
-    description: "O'lmas maxluq Tokkebi o'z qarg'ishiga chek qo'yish uchun inson kelinini topishi kerak, ammo uning muhabbati yangi sinovlarni keltirib chiqaradi.",
-    poster_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600",
-    banner_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1200",
-    janrlar: "Fantastika, Melodrama, Romantika",
-    yil: 2016,
-    likes: 620,
-    liked_users: "[]",
-    korishlar: 4890,
-    video_url: "https://www.w3schools.com/html/mov_bbb.mp4",
-    created_at: new Date(Date.now() - 86400000 * 10).toISOString()
-  }
-];
-
 // GET All Dramas
 app.get("/api/dramas", async (req, res) => {
   res.setHeader("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
@@ -4640,25 +4599,20 @@ app.get("/api/dramas", async (req, res) => {
 
     if (dramas.length === 0) {
       const store = loadLocalStore();
-      if (!store.dramas || store.dramas.length === 0) {
-        store.dramas = DEFAULT_SEED_DRAMAS;
-        saveLocalStore(store);
-        // Also try inserting into MySQL
-        for (const d of DEFAULT_SEED_DRAMAS) {
-          dbQuery(
-            `INSERT IGNORE INTO dramas (id, title, description, poster_url, banner_url, janrlar, yil, likes, liked_users, korishlar, video_url, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [d.id, d.title, d.description, d.poster_url, d.banner_url, d.janrlar, d.yil, d.likes, d.liked_users, d.korishlar, d.video_url, d.created_at]
-          ).catch(() => {});
-        }
-      }
       dramas = store.dramas || [];
     }
 
-    const formatted = dramas.map((d: any) => ({
-      ...d,
-      liked_users: safeJsonParse(d.liked_users, [])
-    }));
+    const store = loadLocalStore();
+    const allEpisodes = store.drama_episodes || [];
+
+    const formatted = dramas.map((d: any) => {
+      const eps = allEpisodes.filter((ep: any) => String(ep.drama_id) === String(d.id));
+      return {
+        ...d,
+        liked_users: safeJsonParse(d.liked_users, []),
+        episodes_count: eps.length
+      };
+    });
 
     res.json(formatted);
   } catch (err) {
@@ -4667,7 +4621,7 @@ app.get("/api/dramas", async (req, res) => {
   }
 });
 
-// GET Single Drama Details
+// GET Single Drama Details with Episodes
 app.get("/api/dramas/:id", async (req, res) => {
   const id = req.params.id;
   try {
@@ -4685,8 +4639,8 @@ app.get("/api/dramas/:id", async (req, res) => {
       console.warn("MySQL get drama detail failed, fallback to local_store:", dbErr);
     }
 
+    const store = loadLocalStore();
     if (!drama) {
-      const store = loadLocalStore();
       const dramas = store.dramas || [];
       const idx = dramas.findIndex((d: any) => String(d.id) === String(id));
       if (idx === -1) {
@@ -4697,11 +4651,181 @@ app.get("/api/dramas/:id", async (req, res) => {
       drama = dramas[idx];
     }
 
+    // Fetch episodes for this drama
+    let episodes: any[] = [];
+    try {
+      const [epRows]: any = await dbQuery(`SELECT * FROM drama_episodes WHERE drama_id = ? ORDER BY qism ASC`, [id]);
+      if (Array.isArray(epRows) && epRows.length > 0) {
+        episodes = epRows;
+      }
+    } catch (e) {}
+
+    if (episodes.length === 0) {
+      episodes = (store.drama_episodes || []).filter((ep: any) => String(ep.drama_id) === String(id));
+      episodes.sort((a: any, b: any) => Number(a.qism) - Number(b.qism));
+    }
+
+    // If no episodes in episodes table but drama has video_url, provide a default episode 1
+    if (episodes.length === 0 && drama.video_url) {
+      episodes = [
+        {
+          id: `ep_1_${drama.id}`,
+          drama_id: drama.id,
+          qism: 1,
+          title: "1-Qism",
+          video_url: drama.video_url,
+          created_at: drama.created_at || new Date().toISOString()
+        }
+      ];
+    }
+
+    drama.episodes = episodes;
     drama.liked_users = safeJsonParse(drama.liked_users, []);
     res.json(drama);
   } catch (err) {
     console.error("Get single drama error:", err);
     res.status(500).json({ error: "Dramani yuklashda xatolik" });
+  }
+});
+
+// GET Drama Episodes list
+app.get("/api/dramas/:id/episodes", async (req, res) => {
+  const id = req.params.id;
+  try {
+    let episodes: any[] = [];
+    try {
+      const [rows]: any = await dbQuery(`SELECT * FROM drama_episodes WHERE drama_id = ? ORDER BY qism ASC`, [id]);
+      if (Array.isArray(rows) && rows.length > 0) {
+        episodes = rows;
+      }
+    } catch (dbErr) {
+      console.warn("MySQL fetch drama episodes error:", dbErr);
+    }
+
+    if (episodes.length === 0) {
+      const store = loadLocalStore();
+      episodes = (store.drama_episodes || []).filter((ep: any) => String(ep.drama_id) === String(id));
+      episodes.sort((a: any, b: any) => Number(a.qism) - Number(b.qism));
+    }
+
+    res.json(episodes);
+  } catch (err) {
+    console.error("Get drama episodes error:", err);
+    res.status(500).json({ error: "Qismlarni yuklashda xatolik" });
+  }
+});
+
+// POST Create Drama Episode (Admin only)
+app.post("/api/dramas/:id/episodes", authenticateToken, async (req: any, res) => {
+  try {
+    if (req.user.role !== "admin") return res.sendStatus(403);
+    const dramaId = req.params.id;
+    const { qism, title, video_url } = req.body;
+
+    if (!video_url || !video_url.trim()) {
+      return res.status(400).json({ error: "Video URL yoki havolani kiriting" });
+    }
+
+    const epNumber = Number(qism) || 1;
+    const newEpId = Date.now();
+    const newEpisode = {
+      id: newEpId,
+      drama_id: dramaId,
+      qism: epNumber,
+      title: title ? title.trim() : `${epNumber}-Qism`,
+      video_url: video_url.trim(),
+      created_at: new Date().toISOString()
+    };
+
+    const store = loadLocalStore();
+    store.drama_episodes = store.drama_episodes || [];
+    store.drama_episodes.push(newEpisode);
+
+    // If this is episode 1 or first episode, update drama's default video_url
+    if (store.dramas) {
+      const dramaIdx = store.dramas.findIndex((d: any) => String(d.id) === String(dramaId));
+      if (dramaIdx >= 0 && (!store.dramas[dramaIdx].video_url || epNumber === 1)) {
+        store.dramas[dramaIdx].video_url = newEpisode.video_url;
+      }
+    }
+    saveLocalStore(store);
+
+    try {
+      await dbQuery(
+        `INSERT INTO drama_episodes (id, drama_id, qism, title, video_url, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [newEpisode.id, newEpisode.drama_id, newEpisode.qism, newEpisode.title, newEpisode.video_url, newEpisode.created_at]
+      );
+      if (epNumber === 1) {
+        await dbQuery(`UPDATE dramas SET video_url = ? WHERE id = ?`, [newEpisode.video_url, dramaId]);
+      }
+    } catch (dbErr) {
+      console.warn("MySQL save drama episode error:", dbErr);
+    }
+
+    res.status(201).json(newEpisode);
+  } catch (err) {
+    console.error("Create drama episode error:", err);
+    res.status(500).json({ error: "Qismni qo'shishda xatolik" });
+  }
+});
+
+// PUT Update Drama Episode (Admin only)
+app.put("/api/dramas/episodes/:episodeId", authenticateToken, async (req: any, res) => {
+  try {
+    if (req.user.role !== "admin") return res.sendStatus(403);
+    const episodeId = req.params.episodeId;
+    const { qism, title, video_url } = req.body;
+
+    const store = loadLocalStore();
+    store.drama_episodes = store.drama_episodes || [];
+    const idx = store.drama_episodes.findIndex((ep: any) => String(ep.id) === String(episodeId));
+    if (idx >= 0) {
+      store.drama_episodes[idx] = {
+        ...store.drama_episodes[idx],
+        qism: qism !== undefined ? Number(qism) : store.drama_episodes[idx].qism,
+        title: title !== undefined ? title : store.drama_episodes[idx].title,
+        video_url: video_url !== undefined ? video_url : store.drama_episodes[idx].video_url
+      };
+      saveLocalStore(store);
+    }
+
+    try {
+      await dbQuery(
+        `UPDATE drama_episodes SET qism = ?, title = ?, video_url = ? WHERE id = ?`,
+        [Number(qism) || 1, title, video_url, episodeId]
+      );
+    } catch (dbErr) {
+      console.warn("MySQL update drama episode error:", dbErr);
+    }
+
+    res.json({ message: "Qism yangilandi" });
+  } catch (err) {
+    console.error("Update drama episode error:", err);
+    res.status(500).json({ error: "Qismni yangilashda xatolik" });
+  }
+});
+
+// DELETE Drama Episode (Admin only)
+app.delete("/api/dramas/episodes/:episodeId", authenticateToken, async (req: any, res) => {
+  try {
+    if (req.user.role !== "admin") return res.sendStatus(403);
+    const episodeId = req.params.episodeId;
+
+    const store = loadLocalStore();
+    store.drama_episodes = (store.drama_episodes || []).filter((ep: any) => String(ep.id) !== String(episodeId));
+    saveLocalStore(store);
+
+    try {
+      await dbQuery(`DELETE FROM drama_episodes WHERE id = ?`, [episodeId]);
+    } catch (dbErr) {
+      console.warn("MySQL delete drama episode error:", dbErr);
+    }
+
+    res.json({ message: "Qism o'chirildi" });
+  } catch (err) {
+    console.error("Delete drama episode error:", err);
+    res.status(500).json({ error: "Qismni o'chirishda xatolik" });
   }
 });
 
@@ -4736,6 +4860,19 @@ app.post("/api/dramas", authenticateToken, async (req: any, res) => {
     const store = loadLocalStore();
     store.dramas = store.dramas || [];
     store.dramas.unshift(newDrama);
+
+    // If video_url was provided with drama, also create 1-episode automatically
+    if (video_url && video_url.trim()) {
+      store.drama_episodes = store.drama_episodes || [];
+      store.drama_episodes.push({
+        id: Date.now() + 1,
+        drama_id: newId,
+        qism: 1,
+        title: "1-Qism",
+        video_url: video_url.trim(),
+        created_at: new Date().toISOString()
+      });
+    }
     saveLocalStore(store);
 
     // Save in MySQL
@@ -4745,6 +4882,13 @@ app.post("/api/dramas", authenticateToken, async (req: any, res) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [newDrama.id, newDrama.title, newDrama.description, newDrama.poster_url, newDrama.banner_url, newDrama.janrlar, newDrama.yil, newDrama.likes, JSON.stringify(newDrama.liked_users), newDrama.korishlar, newDrama.video_url, newDrama.telegram_url, newDrama.created_at]
       );
+      if (video_url && video_url.trim()) {
+        await dbQuery(
+          `INSERT INTO drama_episodes (id, drama_id, qism, title, video_url, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [Date.now() + 1, newId, 1, "1-Qism", video_url.trim(), new Date().toISOString()]
+        );
+      }
     } catch (dbErr) {
       console.warn("MySQL save drama warning:", dbErr);
     }
@@ -4805,17 +4949,19 @@ app.delete("/api/dramas/:id", authenticateToken, async (req: any, res) => {
 
     const store = loadLocalStore();
     store.dramas = (store.dramas || []).filter((d: any) => String(d.id) !== String(id));
+    store.drama_episodes = (store.drama_episodes || []).filter((ep: any) => String(ep.drama_id) !== String(id));
     store.comments = (store.comments || []).filter((c: any) => String(c.drama_id) !== String(id));
     saveLocalStore(store);
 
     try {
       await dbQuery(`DELETE FROM dramas WHERE id = ?`, [id]);
+      await dbQuery(`DELETE FROM drama_episodes WHERE drama_id = ?`, [id]);
       await dbQuery(`DELETE FROM comments WHERE drama_id = ?`, [id]);
     } catch (dbErr) {
       console.warn("MySQL delete drama warning:", dbErr);
     }
 
-    res.json({ message: "Drama o'chirildi" });
+    res.json({ message: "Drama va uning barcha qismlari o'chirildi" });
   } catch (err) {
     console.error("Delete drama error:", err);
     res.status(500).json({ error: "Dramani o'chirishda xatolik" });
@@ -7106,6 +7252,7 @@ async function start() {
       const staticPages = [
         { url: "/", priority: "1.0", freq: "daily" },
         { url: "/animelar", priority: "0.9", freq: "daily" },
+        { url: "/dramalar", priority: "0.9", freq: "daily" },
         { url: "/manga", priority: "0.8", freq: "daily" },
         { url: "/top100", priority: "0.8", freq: "daily" },
         { url: "/jadval", priority: "0.8", freq: "daily" },
@@ -7121,7 +7268,7 @@ async function start() {
         xml += `  <url>\n    <loc>${domain}${page.url}</loc>\n    <lastmod>${todayIso}</lastmod>\n    <changefreq>${page.freq}</changefreq>\n    <priority>${page.priority}</priority>\n  </url>\n`;
       }
       
-      const genres = ["isekai", "sarguzasht", "fantasy", "jangari", "komediya", "dramatiya", "mecha", "romantika", "kriminal", "dahshat", "sport"];
+      const genres = ["isekai", "sarguzasht", "fantasy", "jangari", "komediya", "dramatiya", "drama", "mecha", "romantika", "kriminal", "dahshat", "sport"];
       for (const g of genres) {
         xml += `  <url>\n    <loc>${domain}/${g}</loc>\n    <lastmod>${todayIso}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>\n`;
       }
@@ -7193,6 +7340,41 @@ async function start() {
           xml += `    </image:image>\n`;
           xml += `    <changefreq>daily</changefreq>\n`;
           xml += `    <priority>0.8</priority>\n`;
+          xml += `  </url>\n`;
+        }
+      }
+
+      // 3. Drama pages in Sitemap (For Google & Yandex fast indexing)
+      let dramasList: any[] = [];
+      try {
+        const [dRows]: any = await dbQuery("SELECT * FROM dramas");
+        if (Array.isArray(dRows) && dRows.length > 0) {
+          dramasList = dRows;
+        }
+      } catch (e) {
+        console.warn("Sitemap DB query error for dramas:", e);
+      }
+
+      if (dramasList.length === 0) {
+        const store = loadLocalStore();
+        dramasList = store.dramas || [];
+      }
+
+      for (const d of dramasList) {
+        if (d.id) {
+          const posterUrl = (d.poster_url || d.banner_url || `${domain}/logo.png`).replace(/&/g, "&amp;");
+          const dTitleClean = (d.title || "Drama").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const dramaDate = d.created_at ? new Date(d.created_at).toISOString().split("T")[0] : todayIso;
+          xml += `  <url>\n`;
+          xml += `    <loc>${domain}/drama/${d.id}</loc>\n`;
+          xml += `    <lastmod>${dramaDate}</lastmod>\n`;
+          xml += `    <image:image>\n`;
+          xml += `      <image:loc>${posterUrl}</image:loc>\n`;
+          xml += `      <image:title>${dTitleClean}</image:title>\n`;
+          xml += `      <image:caption>${dTitleClean} - Koreys drama o'zbek tilida</image:caption>\n`;
+          xml += `    </image:image>\n`;
+          xml += `    <changefreq>daily</changefreq>\n`;
+          xml += `    <priority>0.9</priority>\n`;
           xml += `  </url>\n`;
         }
       }
@@ -7332,6 +7514,104 @@ async function start() {
           jsonLdScript = `\n    <script type="application/ld+json">\n    ${JSON.stringify(jsonLd, null, 2)}\n    </script>`;
         }
       }
+      // 3. Drama detail page: /drama/:id
+      else if (reqPath.startsWith("/drama/") && reqPath.length > 7) {
+        const dramaId = req.path.replace(/^\/drama\//, "").split("?")[0].split("/")[0];
+        const store = loadLocalStore();
+        let dramaRaw = (store.dramas || []).find((d: any) => String(d.id) === String(dramaId));
+
+        if (!dramaRaw) {
+          try {
+            const [dRows]: any = await dbQuery("SELECT * FROM dramas WHERE id = ?", [dramaId]);
+            if (Array.isArray(dRows) && dRows[0]) {
+              dramaRaw = dRows[0];
+            }
+          } catch (e) {
+            console.warn("Error fetching drama for SEO:", e);
+          }
+        }
+
+        if (dramaRaw) {
+          const dramaTitle = dramaRaw.title || "Drama";
+          const dramaDesc = dramaRaw.description 
+            ? dramaRaw.description.substring(0, 180).trim() 
+            : "Koreys va Osiyo dramalarini o'zbek tilida eng yuqori sifatda onlayn tomosha qiling.";
+          const dramaPoster = dramaRaw.poster_url || dramaRaw.banner_url || "https://animem.uz/logo.png";
+          
+          titleText = `${dramaTitle} - Koreys Drama O'zbek Tilida Ko'rish | Animem.uz`;
+          descText = `${dramaTitle} dramasi o'zbek tilida bepul onlayn tomosha qilish. ${dramaDesc}`;
+          imageUrl = dramaPoster;
+          shareUrl = `https://animem.uz/drama/${dramaRaw.id}`;
+          imageAltText = `${dramaTitle} koreys drama`;
+
+          const genres = dramaRaw.janrlar ? dramaRaw.janrlar.split(",").map((g: string) => g.trim()) : ["Drama", "Koreys drama"];
+          const jsonLd = {
+            "@context": "https://schema.org",
+            "@type": "TVSeries",
+            "name": dramaTitle,
+            "alternateName": [
+              `${dramaTitle} o'zbek tilida`,
+              `${dramaTitle} koreys drama`,
+              `${dramaTitle} do'rama uzb`
+            ],
+            "image": {
+              "@type": "ImageObject",
+              "url": imageUrl,
+              "name": dramaTitle,
+              "caption": `${dramaTitle} koreys drama posteri`
+            },
+            "description": dramaDesc,
+            "genre": genres,
+            "dateCreated": dramaRaw.yil || 2025,
+            "inLanguage": "uz",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "9.5",
+              "bestRating": "10",
+              "worstRating": "1",
+              "reviewCount": String(Math.max(1, dramaRaw.likes || 15))
+            },
+            "provider": {
+              "@type": "Organization",
+              "name": "Animem Uz",
+              "url": "https://animem.uz"
+            }
+          };
+          jsonLdScript = `\n    <script type="application/ld+json">\n    ${JSON.stringify(jsonLd, null, 2)}\n    </script>`;
+        }
+      }
+      // 4. Dramas Catalog page: /dramalar
+      else if (reqPath === "/dramalar") {
+        titleText = "Koreys Dramalari va Doramalar O'zbek Tilida | Animem.uz";
+        descText = "Eng sara koreys, yapon va xitoy dramalarini (doramalarni) o'zbek tilida, yuqori sifatda (HD) va bepul tomosha qiling. Yangi chiqgan barcha dramalar to'plami.";
+
+        const store = loadLocalStore();
+        const topDramas = (store.dramas || []).slice(0, 30);
+        if (topDramas.length > 0) {
+          const itemListLd = {
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            "name": "O'zbek Tilidagi Koreys Dramalari Katalogi",
+            "description": "Eng sara koreys dramalari va doramalar to'plami",
+            "itemListElement": topDramas.map((d: any, idx: number) => ({
+              "@type": "ListItem",
+              "position": idx + 1,
+              "item": {
+                "@type": "TVSeries",
+                "name": d.title,
+                "url": `https://animem.uz/drama/${d.id}`,
+                "image": {
+                  "@type": "ImageObject",
+                  "url": d.poster_url || d.banner_url || "https://animem.uz/logo.png",
+                  "name": d.title,
+                  "caption": d.title
+                }
+              }
+            }))
+          };
+          jsonLdScript = `\n    <script type="application/ld+json">\n    ${JSON.stringify(itemListLd, null, 2)}\n    </script>`;
+        }
+      }
       // 3. Main catalog pages
       else if (reqPath === "/" || reqPath === "/animelar" || reqPath === "/anime") {
         titleText = "Barcha Animelar - O'zbek tilida tomosha qilish | Animem.uz";
@@ -7455,6 +7735,8 @@ async function start() {
 
   // Route for anime detail pages
   app.get("/anime/:slug", handleDynamicSEO);
+  app.get("/drama/:id", handleDynamicSEO);
+  app.get("/dramalar", handleDynamicSEO);
 
   // Support bot route
   app.post("/api/support-bot", async (req, res) => {

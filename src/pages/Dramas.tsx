@@ -15,7 +15,11 @@ export default function Dramas() {
   const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'likes'>('latest');
 
   useEffect(() => {
-    document.title = "Dramalar - Animem Uz";
+    document.title = "Koreys Dramalari va Doramalar O'zbek Tilida | Animem Uz";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', "Eng sara koreys, yapon va xitoy dramalarini (doramalarni) o'zbek tilida, HD sifatda bepul tomosha qiling.");
+    }
     fetchDramas();
   }, []);
 
