@@ -95,6 +95,7 @@ export interface Comment {
   id: string | number;
   anime_id?: string | number;
   manga_id?: string | number;
+  drama_id?: string | number;
   user_id: string | number;
   user_name: string;
   user_avatar?: string;
@@ -102,10 +103,26 @@ export interface Comment {
   content: string;
   likes?: number;
   dislikes?: number;
-  liked_users?: string[] | number[];
-  disliked_users?: string[] | number[];
+  liked_users?: (string | number)[];
+  disliked_users?: (string | number)[];
   replies?: CommentReply[];
   created_at: string;
+}
+
+export interface Drama {
+  id: string | number;
+  title: string;
+  description?: string;
+  poster_url: string;
+  banner_url?: string;
+  janrlar: string; // Masalan: "Romantika, Komediya, Melodrama"
+  yil: number | string;
+  video_url?: string;
+  telegram_url?: string;
+  likes?: number;
+  liked_users?: (string | number)[];
+  korishlar?: number;
+  created_at?: string;
 }
 
 export interface Message {

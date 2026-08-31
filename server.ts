@@ -270,6 +270,7 @@ function loadLocalStore() {
         messages: [],
         mangas: [],
         manga_chapters: [],
+        dramas: [],
         donations: []
       };
       fs.writeFileSync(LOCAL_STORE_PATH, JSON.stringify(defaultData, null, 2), "utf-8");
@@ -280,6 +281,7 @@ function loadLocalStore() {
     memoryLocalStore = JSON.parse(raw);
     if (!memoryLocalStore.mangas) memoryLocalStore.mangas = [];
     if (!memoryLocalStore.manga_chapters) memoryLocalStore.manga_chapters = [];
+    if (!memoryLocalStore.dramas) memoryLocalStore.dramas = [];
     if (!memoryLocalStore.donations) memoryLocalStore.donations = [];
     return memoryLocalStore;
   } catch (e) {
@@ -598,6 +600,7 @@ async function testDbConnection() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         anime_id BIGINT DEFAULT NULL,
         manga_id BIGINT DEFAULT NULL,
+        drama_id BIGINT DEFAULT NULL,
         user_id INT NOT NULL,
         content TEXT NOT NULL,
         likes INT DEFAULT 0,
@@ -612,6 +615,9 @@ async function testDbConnection() {
     try {
       const [cCols]: any = await connection.query(`SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'comments' AND TABLE_SCHEMA = DATABASE()`);
       const colNames = (cCols || []).map((c: any) => c.COLUMN_NAME);
+      if (!colNames.includes('drama_id')) {
+        await connection.query(`ALTER TABLE comments ADD COLUMN drama_id BIGINT DEFAULT NULL`);
+      }
       if (!colNames.includes('liked_users')) {
         await connection.query(`ALTER TABLE comments ADD COLUMN liked_users TEXT DEFAULT NULL`);
       }
@@ -628,6 +634,30 @@ async function testDbConnection() {
         await connection.query(`ALTER TABLE comments ADD COLUMN dislikes INT DEFAULT 0`);
       }
     } catch(e) {}
+
+    // Create dramas table if not exists in MySQL
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS dramas (
+          id BIGINT PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          poster_url LONGTEXT,
+          banner_url LONGTEXT,
+          janrlar VARCHAR(255),
+          yil INT DEFAULT 2024,
+          likes INT DEFAULT 0,
+          liked_users LONGTEXT DEFAULT NULL,
+          korishlar INT DEFAULT 0,
+          video_url LONGTEXT,
+          telegram_url VARCHAR(500),
+          created_at VARCHAR(255)
+        )
+      `);
+      console.log("Verified dramas table in MySQL.");
+    } catch (e) {
+      console.warn("dramas table creation warning:", e);
+    }
 
     // Ensure messages table for chat
     try {
@@ -4530,6 +4560,428 @@ app.delete("/api/mangas/:mangaId/chapters/:chapterNumber", authenticateToken, as
   } catch (err) {
     console.error("Delete manga chapter error:", err);
     res.status(500).json({ error: "Bobni o'chirishda xatolik" });
+  }
+});
+
+// ==================== DRAMA API ENDPOINTS ====================
+
+const DEFAULT_SEED_DRAMAS = [
+  {
+    id: 1001,
+    title: "Crash Landing on You",
+    description: "Janubiy Koreyalik merosxo'r qiz parashyutda uchish chog'ida bo'ron tufayli Shimoliy Koreyaga tushib qoladi va u yerda o'zini qutqargan ofitser bilan sevishib qoladi.",
+    poster_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600",
+    banner_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200",
+    janrlar: "Melodrama, Romantika, Komediya",
+    yil: 2020,
+    likes: 342,
+    liked_users: "[]",
+    korishlar: 1540,
+    video_url: "https://www.w3schools.com/html/mov_bbb.mp4",
+    created_at: new Date(Date.now() - 86400000 * 5).toISOString()
+  },
+  {
+    id: 1002,
+    title: "Vincenzo",
+    description: "Italiyalik maffiya konsiglerisi Vincenzo Cassano adolat o'rnatish va noqonuniy korporatsiyani yiqitish uchun Seulga qaytadi.",
+    poster_url: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600",
+    banner_url: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1200",
+    janrlar: "Jangari, Komediya, Jinoyat, Drama",
+    yil: 2021,
+    likes: 418,
+    liked_users: "[]",
+    korishlar: 2120,
+    video_url: "https://www.w3schools.com/html/mov_bbb.mp4",
+    created_at: new Date(Date.now() - 86400000 * 3).toISOString()
+  },
+  {
+    id: 1003,
+    title: "All of Us Are Dead",
+    description: "O'rta maktabda zombi virusi tarqalgach, omon qolgan o'quvchilar najotsiz holda o'z hayotlari uchun kurashishga majbur bo'ladilar.",
+    poster_url: "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=600",
+    banner_url: "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=1200",
+    janrlar: "Dahshatli, Drama, Jangari",
+    yil: 2022,
+    likes: 512,
+    liked_users: "[]",
+    korishlar: 3450,
+    video_url: "https://www.w3schools.com/html/mov_bbb.mp4",
+    created_at: new Date(Date.now() - 86400000 * 1).toISOString()
+  },
+  {
+    id: 1004,
+    title: "Goblin: The Lonely and Great God",
+    description: "O'lmas maxluq Tokkebi o'z qarg'ishiga chek qo'yish uchun inson kelinini topishi kerak, ammo uning muhabbati yangi sinovlarni keltirib chiqaradi.",
+    poster_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600",
+    banner_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1200",
+    janrlar: "Fantastika, Melodrama, Romantika",
+    yil: 2016,
+    likes: 620,
+    liked_users: "[]",
+    korishlar: 4890,
+    video_url: "https://www.w3schools.com/html/mov_bbb.mp4",
+    created_at: new Date(Date.now() - 86400000 * 10).toISOString()
+  }
+];
+
+// GET All Dramas
+app.get("/api/dramas", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
+  try {
+    let dramas: any[] = [];
+    try {
+      const [rows]: any = await dbQuery(`SELECT * FROM dramas ORDER BY id DESC`);
+      if (Array.isArray(rows) && rows.length > 0) {
+        dramas = rows;
+      }
+    } catch (dbErr) {
+      console.warn("MySQL fetch dramas failed, fallback to local_store:", dbErr);
+    }
+
+    if (dramas.length === 0) {
+      const store = loadLocalStore();
+      if (!store.dramas || store.dramas.length === 0) {
+        store.dramas = DEFAULT_SEED_DRAMAS;
+        saveLocalStore(store);
+        // Also try inserting into MySQL
+        for (const d of DEFAULT_SEED_DRAMAS) {
+          dbQuery(
+            `INSERT IGNORE INTO dramas (id, title, description, poster_url, banner_url, janrlar, yil, likes, liked_users, korishlar, video_url, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [d.id, d.title, d.description, d.poster_url, d.banner_url, d.janrlar, d.yil, d.likes, d.liked_users, d.korishlar, d.video_url, d.created_at]
+          ).catch(() => {});
+        }
+      }
+      dramas = store.dramas || [];
+    }
+
+    const formatted = dramas.map((d: any) => ({
+      ...d,
+      liked_users: safeJsonParse(d.liked_users, [])
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.error("Get dramas error:", err);
+    res.status(500).json({ error: "Dramalarni yuklashda xatolik" });
+  }
+});
+
+// GET Single Drama Details
+app.get("/api/dramas/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    let drama: any = null;
+
+    try {
+      const [rows]: any = await dbQuery(`SELECT * FROM dramas WHERE id = ?`, [id]);
+      if (Array.isArray(rows) && rows.length > 0) {
+        drama = rows[0];
+        // Increment views
+        await dbQuery(`UPDATE dramas SET korishlar = korishlar + 1 WHERE id = ?`, [id]);
+        drama.korishlar = (drama.korishlar || 0) + 1;
+      }
+    } catch (dbErr) {
+      console.warn("MySQL get drama detail failed, fallback to local_store:", dbErr);
+    }
+
+    if (!drama) {
+      const store = loadLocalStore();
+      const dramas = store.dramas || [];
+      const idx = dramas.findIndex((d: any) => String(d.id) === String(id));
+      if (idx === -1) {
+        return res.status(404).json({ error: "Drama topilmadi" });
+      }
+      dramas[idx].korishlar = (dramas[idx].korishlar || 0) + 1;
+      saveLocalStore(store);
+      drama = dramas[idx];
+    }
+
+    drama.liked_users = safeJsonParse(drama.liked_users, []);
+    res.json(drama);
+  } catch (err) {
+    console.error("Get single drama error:", err);
+    res.status(500).json({ error: "Dramani yuklashda xatolik" });
+  }
+});
+
+// POST Create Drama (Admin only)
+app.post("/api/dramas", authenticateToken, async (req: any, res) => {
+  try {
+    if (req.user.role !== "admin") return res.sendStatus(403);
+    const { title, poster_url, banner_url, janrlar, yil, description, video_url, telegram_url } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "Drama nomi kiritilishi shart" });
+    }
+
+    const newId = Date.now();
+    const newDrama = {
+      id: newId,
+      title: title.trim(),
+      description: description || "",
+      poster_url: poster_url || "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600",
+      banner_url: banner_url || poster_url || "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200",
+      janrlar: janrlar || "Drama",
+      yil: Number(yil) || new Date().getFullYear(),
+      likes: 0,
+      liked_users: [],
+      korishlar: 0,
+      video_url: video_url || "",
+      telegram_url: telegram_url || "",
+      created_at: new Date().toISOString()
+    };
+
+    // Save in local_store
+    const store = loadLocalStore();
+    store.dramas = store.dramas || [];
+    store.dramas.unshift(newDrama);
+    saveLocalStore(store);
+
+    // Save in MySQL
+    try {
+      await dbQuery(
+        `INSERT INTO dramas (id, title, description, poster_url, banner_url, janrlar, yil, likes, liked_users, korishlar, video_url, telegram_url, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [newDrama.id, newDrama.title, newDrama.description, newDrama.poster_url, newDrama.banner_url, newDrama.janrlar, newDrama.yil, newDrama.likes, JSON.stringify(newDrama.liked_users), newDrama.korishlar, newDrama.video_url, newDrama.telegram_url, newDrama.created_at]
+      );
+    } catch (dbErr) {
+      console.warn("MySQL save drama warning:", dbErr);
+    }
+
+    res.status(201).json(newDrama);
+  } catch (err) {
+    console.error("Create drama error:", err);
+    res.status(500).json({ error: "Drama qo'shishda xatolik yuz berdi" });
+  }
+});
+
+// PUT Update Drama (Admin only)
+app.put("/api/dramas/:id", authenticateToken, async (req: any, res) => {
+  try {
+    if (req.user.role !== "admin") return res.sendStatus(403);
+    const id = req.params.id;
+    const { title, poster_url, banner_url, janrlar, yil, description, video_url, telegram_url } = req.body;
+
+    const store = loadLocalStore();
+    store.dramas = store.dramas || [];
+    const idx = store.dramas.findIndex((d: any) => String(d.id) === String(id));
+    if (idx >= 0) {
+      store.dramas[idx] = {
+        ...store.dramas[idx],
+        title: title !== undefined ? title : store.dramas[idx].title,
+        poster_url: poster_url !== undefined ? poster_url : store.dramas[idx].poster_url,
+        banner_url: banner_url !== undefined ? banner_url : store.dramas[idx].banner_url,
+        janrlar: janrlar !== undefined ? janrlar : store.dramas[idx].janrlar,
+        yil: yil !== undefined ? Number(yil) : store.dramas[idx].yil,
+        description: description !== undefined ? description : store.dramas[idx].description,
+        video_url: video_url !== undefined ? video_url : store.dramas[idx].video_url,
+        telegram_url: telegram_url !== undefined ? telegram_url : store.dramas[idx].telegram_url,
+      };
+      saveLocalStore(store);
+    }
+
+    try {
+      await dbQuery(
+        `UPDATE dramas SET title = ?, poster_url = ?, banner_url = ?, janrlar = ?, yil = ?, description = ?, video_url = ?, telegram_url = ? WHERE id = ?`,
+        [title, poster_url, banner_url, janrlar, Number(yil) || 2024, description, video_url, telegram_url, id]
+      );
+    } catch (dbErr) {
+      console.warn("MySQL update drama warning:", dbErr);
+    }
+
+    res.json({ message: "Drama muvaffaqiyatli yangilandi" });
+  } catch (err) {
+    console.error("Update drama error:", err);
+    res.status(500).json({ error: "Dramani yangilashda xatolik" });
+  }
+});
+
+// DELETE Drama (Admin only)
+app.delete("/api/dramas/:id", authenticateToken, async (req: any, res) => {
+  try {
+    if (req.user.role !== "admin") return res.sendStatus(403);
+    const id = req.params.id;
+
+    const store = loadLocalStore();
+    store.dramas = (store.dramas || []).filter((d: any) => String(d.id) !== String(id));
+    store.comments = (store.comments || []).filter((c: any) => String(c.drama_id) !== String(id));
+    saveLocalStore(store);
+
+    try {
+      await dbQuery(`DELETE FROM dramas WHERE id = ?`, [id]);
+      await dbQuery(`DELETE FROM comments WHERE drama_id = ?`, [id]);
+    } catch (dbErr) {
+      console.warn("MySQL delete drama warning:", dbErr);
+    }
+
+    res.json({ message: "Drama o'chirildi" });
+  } catch (err) {
+    console.error("Delete drama error:", err);
+    res.status(500).json({ error: "Dramani o'chirishda xatolik" });
+  }
+});
+
+// POST Toggle Like Drama
+app.post("/api/dramas/:id/like", async (req: any, res) => {
+  try {
+    const id = req.params.id;
+    // Identify user by token or IP / guest ID
+    let identifier: string = "";
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const decoded: any = jwt.verify(token, JWT_SECRET);
+        identifier = `user_${decoded.id}`;
+      } catch {}
+    }
+    if (!identifier) {
+      identifier = req.body?.guestId || req.ip || `guest_${req.headers['user-agent'] || 'anon'}`;
+    }
+
+    let drama: any = null;
+    let likedUsers: string[] = [];
+    let currentLikes = 0;
+
+    // Check in DB
+    try {
+      const [rows]: any = await dbQuery(`SELECT * FROM dramas WHERE id = ?`, [id]);
+      if (Array.isArray(rows) && rows.length > 0) {
+        drama = rows[0];
+        likedUsers = safeJsonParse(drama.liked_users, []);
+        currentLikes = Number(drama.likes) || 0;
+      }
+    } catch (e) {}
+
+    const store = loadLocalStore();
+    store.dramas = store.dramas || [];
+    const localIdx = store.dramas.findIndex((d: any) => String(d.id) === String(id));
+    if (!drama && localIdx >= 0) {
+      drama = store.dramas[localIdx];
+      likedUsers = drama.liked_users || [];
+      currentLikes = Number(drama.likes) || 0;
+    }
+
+    if (!drama && localIdx === -1) {
+      return res.status(404).json({ error: "Drama topilmadi" });
+    }
+
+    const isAlreadyLiked = likedUsers.includes(identifier);
+    let updatedLikes: number;
+    let updatedLikedUsers: string[];
+
+    if (isAlreadyLiked) {
+      updatedLikedUsers = likedUsers.filter(u => u !== identifier);
+      updatedLikes = Math.max(0, currentLikes - 1);
+    } else {
+      updatedLikedUsers = [...likedUsers, identifier];
+      updatedLikes = currentLikes + 1;
+    }
+
+    // Save in local_store
+    if (localIdx >= 0) {
+      store.dramas[localIdx].likes = updatedLikes;
+      store.dramas[localIdx].liked_users = updatedLikedUsers;
+      saveLocalStore(store);
+    }
+
+    // Save in MySQL
+    try {
+      await dbQuery(
+        `UPDATE dramas SET likes = ?, liked_users = ? WHERE id = ?`,
+        [updatedLikes, JSON.stringify(updatedLikedUsers), id]
+      );
+    } catch (e) {}
+
+    res.json({
+      success: true,
+      likes: updatedLikes,
+      isLiked: !isAlreadyLiked
+    });
+  } catch (err) {
+    console.error("Like drama error:", err);
+    res.status(500).json({ error: "Layk bosishda xatolik" });
+  }
+});
+
+// GET Drama Comments
+app.get("/api/dramas/:id/comments", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const [rows]: any = await dbQuery(
+      `SELECT c.*, u.name AS user_name, u.avatar_url AS user_avatar 
+       FROM comments c 
+       LEFT JOIN users u ON c.user_id = u.id 
+       WHERE c.drama_id = ? 
+       ORDER BY c.id DESC`,
+      [id]
+    );
+    if (Array.isArray(rows) && rows.length > 0) {
+      const parsed = rows.map((r: any) => ({
+        ...r,
+        liked_users: safeJsonParse(r.liked_users, []),
+        disliked_users: safeJsonParse(r.disliked_users, []),
+        replies: safeJsonParse(r.replies, [])
+      }));
+      return res.json(parsed);
+    }
+  } catch (err) {
+    console.warn("Drama comments fetch fallback:", (err as any)?.message);
+  }
+  const store = loadLocalStore();
+  const comms = (store.comments || []).filter((c: any) => String(c.drama_id) === String(id));
+  res.json(comms);
+});
+
+// POST Drama Comment
+app.post("/api/dramas/:id/comments", authenticateToken, async (req: any, res) => {
+  try {
+    const dramaId = req.params.id;
+    const userId = req.user.id;
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: "Fikr matni kiritilmadi" });
+    }
+
+    const [result]: any = await dbQuery(
+      "INSERT INTO comments (drama_id, user_id, content, likes, dislikes, liked_users, disliked_users, replies) VALUES (?, ?, ?, 0, 0, '[]', '[]', '[]')",
+      [dramaId, userId, content]
+    );
+
+    let userAvatar = req.user.avatar_url || null;
+    try {
+      const [uRows]: any = await dbQuery("SELECT avatar_url FROM users WHERE id = ?", [userId]);
+      if (uRows && uRows.length > 0 && uRows[0].avatar_url) {
+        userAvatar = uRows[0].avatar_url;
+      }
+    } catch (e) {}
+
+    const newComment = {
+      id: result?.insertId || Date.now(),
+      drama_id: Number(dramaId),
+      user_id: userId,
+      user_name: req.user.name,
+      user_avatar: userAvatar,
+      content,
+      likes: 0,
+      dislikes: 0,
+      liked_users: [],
+      disliked_users: [],
+      replies: [],
+      created_at: new Date().toISOString(),
+    };
+
+    const store = loadLocalStore();
+    store.comments = store.comments || [];
+    store.comments.unshift(newComment);
+    saveLocalStore(store);
+
+    res.status(201).json(newComment);
+  } catch (err) {
+    console.error("Add drama comment error:", err);
+    res.status(500).json({ error: "Fikr qoldirishda xatolik yuz berdi" });
   }
 });
 

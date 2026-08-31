@@ -35,6 +35,7 @@ export interface Translations {
   navHome: string;
   navAnimes: string;
   navManga: string;
+  navDramas: string;
   navDonat: string;
   navSchedule: string;
   navNewReleases: string;
@@ -48,6 +49,7 @@ export interface Translations {
   // Home Page
   popularAnimes: string;
   latestEpisodes: string;
+  latestDramas: string;
   trendingToday: string;
   ongoingAnimes: string;
   completedAnimes: string;
@@ -232,6 +234,7 @@ export const translations: Record<Language, Translations> = {
     navHome: "Bosh sahifa",
     navAnimes: "Animelar",
     navManga: "Mangalar",
+    navDramas: "Dramalar",
     navDonat: "Donat",
     navSchedule: "Jadval",
     navNewReleases: "Yangi chiqishlar",
@@ -244,6 +247,7 @@ export const translations: Record<Language, Translations> = {
     
     popularAnimes: "Mashhur Animelar",
     latestEpisodes: "So'nggi Qismlar",
+    latestDramas: "Eng so'nggi dramalar",
     trendingToday: "Bugun Trendda",
     ongoingAnimes: "Davom etayotganlar",
     completedAnimes: "Tugallanganlar",
@@ -417,6 +421,7 @@ export const translations: Record<Language, Translations> = {
     navHome: "Главная",
     navAnimes: "Аниме",
     navManga: "Манга",
+    navDramas: "Дорамы",
     navDonat: "Донат",
     navSchedule: "Расписание",
     navNewReleases: "Новинки",
@@ -429,6 +434,7 @@ export const translations: Record<Language, Translations> = {
     
     popularAnimes: "Популярные Аниме",
     latestEpisodes: "Новые Серии",
+    latestDramas: "Свежие Дорамы",
     trendingToday: "В тренде сегодня",
     ongoingAnimes: "Онгоинги",
     completedAnimes: "Завершенные",
@@ -602,6 +608,7 @@ export const translations: Record<Language, Translations> = {
     navHome: "Home",
     navAnimes: "Anime",
     navManga: "Manga",
+    navDramas: "Dramas",
     navDonat: "Donate",
     navSchedule: "Schedule",
     navNewReleases: "New Releases",
@@ -614,6 +621,7 @@ export const translations: Record<Language, Translations> = {
     
     popularAnimes: "Popular Anime",
     latestEpisodes: "Latest Episodes",
+    latestDramas: "Latest Dramas",
     trendingToday: "Trending Today",
     ongoingAnimes: "Ongoing Anime",
     completedAnimes: "Completed",

@@ -27,6 +27,8 @@ const Animelar = lazy(() => import('./pages/Animelar'));
 const Mangalar = lazy(() => import('./pages/Mangalar'));
 const MangaDetails = lazy(() => import('./pages/MangaDetails'));
 const MangaReader = lazy(() => import('./pages/MangaReader'));
+const Dramas = lazy(() => import('./pages/Dramas'));
+const DramaView = lazy(() => import('./pages/DramaView'));
 const Jadval = lazy(() => import('./pages/Jadval'));
 const YangiChiqishlar = lazy(() => import('./pages/YangiChiqishlar'));
 const Top100 = lazy(() => import('./pages/Top100'));
@@ -236,6 +238,12 @@ export default function App() {
 
               <Route path="/manga/:id/read/:chapterNumber" element={<MangaReader />} />
               <Route path="/:lang/manga/:id/read/:chapterNumber" element={<MangaReader />} />
+
+              {/* Drama Routes */}
+              <Route path="/dramalar" element={<Dramas />} />
+              <Route path="/:lang/dramalar" element={<Dramas />} />
+              <Route path="/drama/:id" element={<DramaView />} />
+              <Route path="/:lang/drama/:id" element={<DramaView />} />
 
               <Route path="/jadval" element={<Jadval />} />
               <Route path="/:lang/jadval" element={<Jadval />} />
