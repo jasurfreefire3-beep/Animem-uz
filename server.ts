@@ -7240,6 +7240,45 @@ async function start() {
       .replace(/^-+|-+$/g, "");
   };
 
+  const escapeXml = (str: string | null | undefined): string => {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  };
+
+  const toAbsoluteUrl = (url: string | null | undefined, domain: string = "https://animem.uz"): string => {
+    if (!url || typeof url !== "string") return `${domain}/logo.png`;
+    const trimmed = url.trim();
+    if (!trimmed || trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
+      return `${domain}/logo.png`;
+    }
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+    if (trimmed.startsWith("//")) {
+      return `https:${trimmed}`;
+    }
+    if (trimmed.startsWith("/")) {
+      return `${domain}${trimmed}`;
+    }
+    return `${domain}/${trimmed}`;
+  };
+
+  const safeIsoDate = (dateVal: any, fallbackIso: string): string => {
+    try {
+      if (!dateVal) return fallbackIso;
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return fallbackIso;
+      return d.toISOString().split("T")[0];
+    } catch {
+      return fallbackIso;
+    }
+  };
+
   // Dynamic Sitemap XML generator (Optimized for Yandex & Google)
   app.get("/sitemap.xml", async (req, res) => {
     try {
@@ -7290,11 +7329,11 @@ async function start() {
       }
       
       for (const a of animesList) {
-        const slug = toSlugLocal(a.title);
+        const slug = toSlugLocal(a.title) || String(a.id);
         if (slug) {
-          const imgUrl = (a.image_url || `${domain}/logo.png`).replace(/&/g, "&amp;");
-          const titleClean = (a.title || "Anime").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const animeDate = a.updated_at ? new Date(a.updated_at).toISOString().split("T")[0] : todayIso;
+          const imgUrl = escapeXml(toAbsoluteUrl(a.image_url, domain));
+          const titleClean = escapeXml(a.title || "Anime");
+          const animeDate = safeIsoDate(a.updated_at || a.created_at, todayIso);
           xml += `  <url>\n`;
           xml += `    <loc>${domain}/anime/${slug}</loc>\n`;
           xml += `    <lastmod>${animeDate}</lastmod>\n`;
@@ -7327,9 +7366,9 @@ async function start() {
 
       for (const m of mangasList) {
         if (m.id) {
-          const coverUrl = (m.cover_url || `${domain}/logo.png`).replace(/&/g, "&amp;");
-          const mTitleClean = (m.title || "Manga").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const mangaDate = m.updated_at ? new Date(m.updated_at).toISOString().split("T")[0] : todayIso;
+          const coverUrl = escapeXml(toAbsoluteUrl(m.cover_url, domain));
+          const mTitleClean = escapeXml(m.title || "Manga");
+          const mangaDate = safeIsoDate(m.updated_at || m.created_at, todayIso);
           xml += `  <url>\n`;
           xml += `    <loc>${domain}/manga/${m.id}</loc>\n`;
           xml += `    <lastmod>${mangaDate}</lastmod>\n`;
@@ -7362,9 +7401,9 @@ async function start() {
 
       for (const d of dramasList) {
         if (d.id) {
-          const posterUrl = (d.poster_url || d.banner_url || `${domain}/logo.png`).replace(/&/g, "&amp;");
-          const dTitleClean = (d.title || "Drama").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const dramaDate = d.created_at ? new Date(d.created_at).toISOString().split("T")[0] : todayIso;
+          const posterUrl = escapeXml(toAbsoluteUrl(d.poster_url || d.banner_url, domain));
+          const dTitleClean = escapeXml(d.title || "Drama");
+          const dramaDate = safeIsoDate(d.created_at, todayIso);
           xml += `  <url>\n`;
           xml += `    <loc>${domain}/drama/${d.id}</loc>\n`;
           xml += `    <lastmod>${dramaDate}</lastmod>\n`;
@@ -7700,6 +7739,9 @@ async function start() {
           descText = `Eng sara ${gName} janridagi o'zbekcha tarjima animelar to'plami. Animem.uz saytida HD formatda bepul tomosha qiling.`;
         }
       }
+
+      // Ensure image URL is absolute for social bots and crawlers
+      imageUrl = toAbsoluteUrl(imageUrl);
 
       // Replace metadata in HTML template
       html = html.replace(/<title>.*?<\/title>/gi, `<title>${titleText}</title>`);
