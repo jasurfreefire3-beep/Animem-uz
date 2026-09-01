@@ -13,13 +13,14 @@ import AdminMangalar from '../components/AdminMangalar';
 import AdminDramalar from '../components/AdminDramalar';
 import AdminDonatlar from '../components/AdminDonatlar';
 import AdminUsers from '../components/AdminUsers';
+import AdminGifs from '../components/AdminGifs';
 import OnlineUsersTab from '../components/OnlineUsersTab';
 import ImageUploader from '../components/ImageUploader';
 
 export default function Admin() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'manage_animes' | 'add_anime' | 'episodes' | 'online_users' | 'notifications' | 'mangas' | 'dramas' | 'users' | 'donations'>('manage_animes');
+  const [activeTab, setActiveTab] = useState<'manage_animes' | 'add_anime' | 'episodes' | 'online_users' | 'notifications' | 'mangas' | 'dramas' | 'users' | 'donations' | 'gifs'>('manage_animes');
   
   // Anime Form States
   const [title, setTitle] = useState('');
@@ -621,6 +622,18 @@ export default function Admin() {
         >
           <CreditCard size={16} />
           <span>Donatlar</span>
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('gifs');
+            setMessage({ type: '', text: '' });
+          }}
+          className={`flex items-center space-x-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-sm text-xs sm:text-sm font-bold transition-colors flex-1 justify-center ${
+            activeTab === 'gifs' ? 'bg-[#ff006a] text-white' : 'text-white/50 hover:bg-[#222] hover:text-white'
+          }`}
+        >
+          <Image size={16} />
+          <span>GIF Stikerlar</span>
         </button>
       </div>
 
@@ -1375,13 +1388,23 @@ export default function Admin() {
         </motion.div>
       )}
 
-      {/* Tab 6: Donatlar */}
+      {/* Tab: Donatlar */}
       {activeTab === 'donations' && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <AdminDonatlar />
+        </motion.div>
+      )}
+
+      {/* Tab: GIF Stikerlar */}
+      {activeTab === 'gifs' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <AdminGifs />
         </motion.div>
       )}
     </div>

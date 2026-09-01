@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
 
-export const LOADING_IMAGE_URL = 'https://api.animem.uz/api/images/1788100536951_0twmwyl';
+export const LOADING_IMAGE_URL = 'https://i.pinimg.com/736x/17/c6/88/17c688c6242fe4c3293be182924e73a3.jpg';
 
 interface LoadingScreenProps {
   text?: string;

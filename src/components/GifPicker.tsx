@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, X, Flame } from 'lucide-react';
 
@@ -33,6 +33,9 @@ export const ANIMEM_GIFS = [
   "https://api.animem.uz/i/632296a9-9ef1-453a-ac08-9db0aebdfc8c"
 ];
 
+// Global in-memory cache for fast display
+let cachedGifList: string[] = ANIMEM_GIFS;
+
 interface GifPickerProps {
   onSelectGif: (gifUrl: string) => void;
   onClose?: () => void;
@@ -40,7 +43,30 @@ interface GifPickerProps {
 }
 
 export default function GifPicker({ onSelectGif, onClose, className = '' }: GifPickerProps) {
+  const [gifList, setGifList] = useState<string[]>(cachedGifList);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/gifs')
+      .then(res => res.json())
+      .then(data => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          const urls = data.map((item: any) => item.url || item).filter(Boolean);
+          if (urls.length > 0) {
+            cachedGifList = urls;
+            setGifList(urls);
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback to static list
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <motion.div
@@ -61,7 +87,7 @@ export default function GifPicker({ onSelectGif, onClose, className = '' }: GifP
             Anime GIF Stikerlar
           </span>
           <span className="text-[10px] font-semibold text-white/40 bg-white/5 px-1.5 py-0.5 rounded-full">
-            {ANIMEM_GIFS.length} ta
+            {gifList.length} ta
           </span>
         </div>
 
@@ -79,7 +105,7 @@ export default function GifPicker({ onSelectGif, onClose, className = '' }: GifP
 
       {/* GIFs Grid */}
       <div className="p-2.5 max-h-64 sm:max-h-72 overflow-y-auto custom-scrollbar grid grid-cols-4 gap-2 bg-[#09090c]">
-        {ANIMEM_GIFS.map((gifUrl, idx) => (
+        {gifList.map((gifUrl, idx) => (
           <button
             key={idx}
             type="button"
@@ -100,6 +126,9 @@ export default function GifPicker({ onSelectGif, onClose, className = '' }: GifP
               loading="lazy"
               decoding="async"
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/100x100?text=GIF';
+              }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>

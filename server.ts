@@ -714,6 +714,64 @@ async function testDbConnection() {
       console.warn("media_files table creation warning:", e);
     }
 
+    // Ensure gifs table in MySQL
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS gifs (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          title VARCHAR(255) DEFAULT '',
+          url LONGTEXT NOT NULL,
+          media_id VARCHAR(64) DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
+      `);
+      console.log("Verified gifs table in MySQL.");
+
+      // Check if seeded
+      const [existingGifs]: any = await connection.query(`SELECT COUNT(*) as count FROM gifs`);
+      if (existingGifs && existingGifs[0] && existingGifs[0].count === 0) {
+        console.log("Seeding default GIFs into MySQL database...");
+        const defaultGifs = [
+          "https://api.animem.uz/i/47253226-8c0c-4bd7-8a13-63fc8ab21048",
+          "https://api.animem.uz/i/024daac2-c373-46d9-a1d3-17b772cf9d8d",
+          "https://api.animem.uz/i/7f001189-caff-4761-b773-1ef852ba3405",
+          "https://api.animem.uz/i/e14ebcc6-3198-4769-988e-b532d768c2c0",
+          "https://api.animem.uz/i/a6740e1b-8128-4a35-9b59-991702aa7953",
+          "https://api.animem.uz/i/20275072-6bcb-4bbf-9c31-b963c535ca52",
+          "https://api.animem.uz/i/7f56e16a-336f-40e7-a088-3e7d379b6e7e",
+          "https://api.animem.uz/i/e013bbda-731b-4243-b1a5-82b9184e6ba8",
+          "https://api.animem.uz/i/0ed4d485-ed9a-42c4-96cf-0ea9e2520ff8",
+          "https://api.animem.uz/i/4dcca4bb-4a81-40ee-b12d-1584b122bc20",
+          "https://api.animem.uz/i/ee473d3e-95c5-4654-ab79-0f7f80bf72ac",
+          "https://api.animem.uz/i/94bf66ce-7403-4a2f-8db6-267f15cd3d73",
+          "https://api.animem.uz/i/d5740534-37b6-42f2-92d1-0d6012f7b424",
+          "https://api.animem.uz/i/d6702c5f-a45e-4259-b3ac-6ac028671136",
+          "https://api.animem.uz/i/863cae92-7e12-46d6-96c5-cf6da96afa43",
+          "https://api.animem.uz/i/11e32365-a5d1-44b8-9eaf-809040de5fc3",
+          "https://api.animem.uz/i/7c9b7e12-2d75-418a-b867-2a83169b9143",
+          "https://api.animem.uz/i/b0000dc1-622a-4136-b20d-c7464b2dfee3",
+          "https://api.animem.uz/i/f29d2f0f-4eed-43e3-8a18-c68acf9703f2",
+          "https://api.animem.uz/i/ebb32df7-d609-46fa-a739-57b686bea1a4",
+          "https://api.animem.uz/i/6ad422b0-29ff-4c44-b3bd-30e6015701ae",
+          "https://api.animem.uz/i/d5077661-9cde-4524-ae21-be259f1e8b8a",
+          "https://api.animem.uz/i/423b7231-db98-41e6-ae1e-af0ded6ca0ef",
+          "https://api.animem.uz/i/cfae88fb-ade5-495c-a441-5b800075382b",
+          "https://api.animem.uz/i/6b895206-f186-4db0-9a82-89ad97769806",
+          "https://api.animem.uz/i/088aba4e-b0ef-443b-b7a6-bf6b8609e2b4",
+          "https://api.animem.uz/i/208c0d15-d9cb-4507-ac51-814423a11d59",
+          "https://api.animem.uz/i/632296a9-9ef1-453a-ac08-9db0aebdfc8c"
+        ];
+        for (let i = 0; i < defaultGifs.length; i++) {
+          await connection.query(`INSERT INTO gifs (title, url) VALUES (?, ?)`, [
+            `Anime GIF #${i + 1}`,
+            defaultGifs[i]
+          ]);
+        }
+      }
+    } catch (e) {
+      console.warn("gifs table creation warning:", e);
+    }
+
     // Ensure animes and mangas image columns support large text / data
     try {
       await connection.query(`ALTER TABLE animes MODIFY COLUMN image_url LONGTEXT`);
@@ -2382,6 +2440,224 @@ app.get("/api/media/:id", async (req: any, res: any) => {
   } catch (err: any) {
     console.error("Serve media from MySQL error:", err);
     return res.status(500).send("Rasmni bazadan yuklab olishda xatolik");
+  }
+});
+
+// --- GIF Management Endpoints (MySQL & Fast Memory Cache) ---
+const STATIC_FALLBACK_GIFS = [
+  "https://api.animem.uz/i/47253226-8c0c-4bd7-8a13-63fc8ab21048",
+  "https://api.animem.uz/i/024daac2-c373-46d9-a1d3-17b772cf9d8d",
+  "https://api.animem.uz/i/7f001189-caff-4761-b773-1ef852ba3405",
+  "https://api.animem.uz/i/e14ebcc6-3198-4769-988e-b532d768c2c0",
+  "https://api.animem.uz/i/a6740e1b-8128-4a35-9b59-991702aa7953",
+  "https://api.animem.uz/i/20275072-6bcb-4bbf-9c31-b963c535ca52",
+  "https://api.animem.uz/i/7f56e16a-336f-40e7-a088-3e7d379b6e7e",
+  "https://api.animem.uz/i/e013bbda-731b-4243-b1a5-82b9184e6ba8",
+  "https://api.animem.uz/i/0ed4d485-ed9a-42c4-96cf-0ea9e2520ff8",
+  "https://api.animem.uz/i/4dcca4bb-4a81-40ee-b12d-1584b122bc20",
+  "https://api.animem.uz/i/ee473d3e-95c5-4654-ab79-0f7f80bf72ac",
+  "https://api.animem.uz/i/94bf66ce-7403-4a2f-8db6-267f15cd3d73",
+  "https://api.animem.uz/i/d5740534-37b6-42f2-92d1-0d6012f7b424",
+  "https://api.animem.uz/i/d6702c5f-a45e-4259-b3ac-6ac028671136",
+  "https://api.animem.uz/i/863cae92-7e12-46d6-96c5-cf6da96afa43",
+  "https://api.animem.uz/i/11e32365-a5d1-44b8-9eaf-809040de5fc3",
+  "https://api.animem.uz/i/7c9b7e12-2d75-418a-b867-2a83169b9143",
+  "https://api.animem.uz/i/b0000dc1-622a-4136-b20d-c7464b2dfee3",
+  "https://api.animem.uz/i/f29d2f0f-4eed-43e3-8a18-c68acf9703f2",
+  "https://api.animem.uz/i/ebb32df7-d609-46fa-a739-57b686bea1a4",
+  "https://api.animem.uz/i/6ad422b0-29ff-4c44-b3bd-30e6015701ae",
+  "https://api.animem.uz/i/d5077661-9cde-4524-ae21-be259f1e8b8a",
+  "https://api.animem.uz/i/423b7231-db98-41e6-ae1e-af0ded6ca0ef",
+  "https://api.animem.uz/i/cfae88fb-ade5-495c-a441-5b800075382b",
+  "https://api.animem.uz/i/6b895206-f186-4db0-9a82-89ad97769806",
+  "https://api.animem.uz/i/088aba4e-b0ef-443b-b7a6-bf6b8609e2b4",
+  "https://api.animem.uz/i/208c0d15-d9cb-4507-ac51-814423a11d59",
+  "https://api.animem.uz/i/632296a9-9ef1-453a-ac08-9db0aebdfc8c"
+].map((u, i) => ({ id: i + 1, title: `Anime GIF #${i + 1}`, url: u, media_id: null }));
+
+// 1. Get all GIFs
+app.get("/api/gifs", async (req: any, res: any) => {
+  res.setHeader("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
+  const cached = getCache<any[]>("api_all_gifs", 30000);
+  if (cached) {
+    return res.json(cached);
+  }
+
+  try {
+    const [rows]: any = await dbQuery("SELECT * FROM gifs ORDER BY id ASC");
+    if (Array.isArray(rows) && rows.length > 0) {
+      const store = loadLocalStore();
+      store.gifs = rows;
+      saveLocalStore(store);
+      setCache("api_all_gifs", rows);
+      return res.json(rows);
+    }
+  } catch (err: any) {
+    console.warn("GIF fetch falling back:", err?.message || err);
+  }
+
+  const store = loadLocalStore();
+  const list = (store.gifs && store.gifs.length > 0) ? store.gifs : STATIC_FALLBACK_GIFS;
+  setCache("api_all_gifs", list);
+  return res.json(list);
+});
+
+// 2. Add GIF via URL (Admin only)
+app.post("/api/gifs", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Faqat admin qo'sha oladi" });
+    }
+    const { url, title } = req.body;
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      return res.status(400).json({ error: "GIF URL manzili kiritilishi shart" });
+    }
+
+    const trimmedUrl = url.trim();
+    const gifTitle = (title || "").trim() || "Anime GIF";
+
+    let insertedId = Date.now();
+    try {
+      const [result]: any = await dbQuery(
+        "INSERT INTO gifs (title, url) VALUES (?, ?)",
+        [gifTitle, trimmedUrl]
+      );
+      if (result?.insertId) insertedId = result.insertId;
+    } catch (e: any) {
+      console.warn("Save GIF to DB warning:", e?.message || e);
+    }
+
+    const newGif = {
+      id: insertedId,
+      title: gifTitle,
+      url: trimmedUrl,
+      media_id: null,
+      created_at: new Date()
+    };
+
+    const store = loadLocalStore();
+    if (!store.gifs) store.gifs = [...STATIC_FALLBACK_GIFS];
+    store.gifs.push(newGif);
+    saveLocalStore(store);
+    invalidateServerCache("api_all_gifs");
+
+    return res.status(201).json({
+      success: true,
+      gif: newGif
+    });
+  } catch (err: any) {
+    console.error("Add GIF URL error:", err);
+    return res.status(500).json({ error: "GIF saqlashda xatolik" });
+  }
+});
+
+// 3. Upload GIF from device directly to MySQL database (Admin only)
+app.post("/api/gifs/upload", authenticateToken, memoryUpload.single("file"), async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Faqat admin yuklay oladi" });
+    }
+
+    const fileBuffer = req.file?.buffer;
+    const filename = req.file?.originalname || "sticker.gif";
+    const mimeType = req.file?.mimetype || "image/gif";
+    const fileSize = req.file?.size || (fileBuffer ? fileBuffer.length : 0);
+
+    if (!fileBuffer || fileBuffer.length === 0) {
+      return res.status(400).json({ error: "Fayl tanlanmadi yoki bo'sh" });
+    }
+
+    const base64String = fileBuffer.toString("base64");
+    const mediaId = "gif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+
+    // Save directly into MySQL database (media_files table)
+    try {
+      await dbQuery(
+        `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?)`,
+        [mediaId, filename, mimeType, base64String, fileSize]
+      );
+    } catch (e: any) {
+      console.warn("media_files insert warning:", e?.message || e);
+    }
+
+    // Cache in RAM for instant streaming
+    mediaMemoryCache.set(mediaId, { mimeType, base64: base64String, buffer: fileBuffer });
+
+    const mediaUrl = `/api/media/${mediaId}`;
+    const customTitle = (req.body.title || "").trim() || filename.replace(/\.[^/.]+$/, "");
+
+    let insertedId = Date.now();
+    try {
+      const [result]: any = await dbQuery(
+        "INSERT INTO gifs (title, url, media_id) VALUES (?, ?, ?)",
+        [customTitle, mediaUrl, mediaId]
+      );
+      if (result?.insertId) insertedId = result.insertId;
+    } catch (e: any) {
+      console.warn("gifs insert warning:", e?.message || e);
+    }
+
+    const newGif = {
+      id: insertedId,
+      title: customTitle,
+      url: mediaUrl,
+      media_id: mediaId,
+      created_at: new Date()
+    };
+
+    const store = loadLocalStore();
+    if (!store.gifs) store.gifs = [...STATIC_FALLBACK_GIFS];
+    store.gifs.push(newGif);
+    saveLocalStore(store);
+    invalidateServerCache("api_all_gifs");
+
+    return res.status(201).json({
+      success: true,
+      gif: newGif
+    });
+  } catch (err: any) {
+    console.error("Upload GIF file error:", err);
+    return res.status(500).json({ error: "GIF faylini MySQL bazasiga yuklashda xatolik yuz berdi" });
+  }
+});
+
+// 4. Delete GIF from MySQL (Admin only)
+app.delete("/api/gifs/:id", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Faqat admin o'chira oladi" });
+    }
+
+    const gifId = req.params.id;
+    if (!gifId) return res.status(400).json({ error: "GIF ID kiritilishi shart" });
+
+    // Try deleting from database
+    try {
+      const [rows]: any = await dbQuery("SELECT * FROM gifs WHERE id = ?", [gifId]);
+      if (rows && rows.length > 0) {
+        const gifItem = rows[0];
+        await dbQuery("DELETE FROM gifs WHERE id = ?", [gifId]);
+        if (gifItem.media_id) {
+          await dbQuery("DELETE FROM media_files WHERE id = ?", [gifItem.media_id]);
+          mediaMemoryCache.delete(gifItem.media_id);
+        }
+      }
+    } catch (e: any) {
+      console.warn("Delete GIF from DB warning:", e?.message || e);
+    }
+
+    // Also remove from local store
+    const store = loadLocalStore();
+    if (store.gifs) {
+      store.gifs = store.gifs.filter((g: any) => String(g.id) !== String(gifId));
+      saveLocalStore(store);
+    }
+    invalidateServerCache("api_all_gifs");
+
+    return res.json({ success: true, message: "GIF muvaffaqiyatli o'chirildi", id: gifId });
+  } catch (err: any) {
+    console.error("Delete GIF error:", err);
+    return res.status(500).json({ error: "GIF o'chirishda xatolik" });
   }
 });
 
