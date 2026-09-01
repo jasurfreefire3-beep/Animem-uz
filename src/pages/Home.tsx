@@ -5,7 +5,6 @@ import { Star, PlayCircle, Calendar, Play, Clock, Grid, MessageSquare, ChevronLe
 import { motion, AnimatePresence } from 'motion/react';
 import AnimeCard from '../components/AnimeCard';
 import DramaCard from '../components/DramaCard';
-import ContinueWatchingShelf from '../components/ContinueWatchingShelf';
 import { useAuth } from '../context/AuthContext';
 
 export default function Home() {
@@ -268,9 +267,6 @@ export default function Home() {
         </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Continue Watching Shelf (Only shows when user has watch progress) */}
-      <ContinueWatchingShelf />
 
       {/* Main Content Layout */}
       <div className="flex flex-col xl:flex-row gap-8">
