@@ -58,6 +58,7 @@ export default function App() {
   
   const location = useLocation();
   const isSupportBot = location.pathname === '/support';
+  const isReels = location.pathname === '/reels' || location.pathname.startsWith('/reels');
 
   // Scroll to top on route change
   useEffect(() => {
@@ -91,6 +92,21 @@ export default function App() {
         <Routes>
           <Route path="/support" element={<SupportBot />} />
         </Routes>
+      </div>
+    );
+  }
+
+  if (isReels) {
+    return (
+      <div className="h-[100dvh] w-screen overflow-hidden bg-black text-white select-none">
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/reels" element={<Reels />} />
+            <Route path="/:lang/reels" element={<Reels />} />
+            <Route path="/reels/:id" element={<Reels />} />
+            <Route path="/:lang/reels/:id" element={<Reels />} />
+          </Routes>
+        </Suspense>
       </div>
     );
   }

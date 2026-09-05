@@ -3036,28 +3036,31 @@ function getClientIdentifier(req: any): { userId: number | null, identifier: str
 
 // 1. Get all Reels (Supports filtering by ?user_id=...)
 app.get("/api/reels", async (req: any, res: any) => {
-  res.setHeader("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   const { userId, identifier } = getClientIdentifier(req);
   const targetUserId = req.query.user_id ? Number(req.query.user_id) : null;
 
   try {
     let sql = `
       SELECT r.*,
+        COALESCE(NULLIF(u.username, ''), NULLIF(u.name, ''), NULLIF(r.author_name, ''), 'Animem.uz') as author_name,
+        COALESCE(NULLIF(u.avatar_url, ''), NULLIF(r.author_avatar, ''), 'https://files.catbox.moe/45hoi6.png') as author_avatar,
         (SELECT COUNT(*) FROM reel_comments WHERE reel_id = r.id) as comments_count,
         EXISTS(SELECT 1 FROM reel_likes WHERE reel_id = r.id AND user_identifier = ?) as is_liked
       FROM reels r
+      LEFT JOIN users u ON r.user_id = u.id
     `;
     const params: any[] = [identifier];
     if (targetUserId && !isNaN(targetUserId)) {
       sql += ` WHERE r.user_id = ? `;
       params.push(targetUserId);
     }
-    sql += ` ORDER BY r.id DESC`;
+    sql += ` ORDER BY RAND()`;
 
     const [rows]: any = await dbQuery(sql, params);
 
-    if (Array.isArray(rows)) {
-      // Shuffle randomly on server side so every request/user gets a random order
+    if (Array.isArray(rows) && rows.length > 0) {
+      // Shuffle randomly on server side so every request gets a unique random order
       for (let i = rows.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [rows[i], rows[j]] = [rows[j], rows[i]];
@@ -3065,6 +3068,8 @@ app.get("/api/reels", async (req: any, res: any) => {
 
       const formatted = rows.map((row: any) => ({
         ...row,
+        author_name: row.author_name || 'Animem.uz',
+        author_avatar: row.author_avatar || 'https://files.catbox.moe/45hoi6.png',
         is_liked: Boolean(row.is_liked),
         comments_count: Number(row.comments_count || 0)
       }));
@@ -3076,9 +3081,14 @@ app.get("/api/reels", async (req: any, res: any) => {
 
   // Fallback to local store or static reels
   const store = loadLocalStore();
-  let reels = (store.reels && store.reels.length > 0) ? store.reels : STATIC_FALLBACK_REELS;
+  let reels = (store.reels && store.reels.length > 0) ? [...store.reels] : [...STATIC_FALLBACK_REELS];
   if (targetUserId && !isNaN(targetUserId)) {
     reels = reels.filter((r: any) => Number(r.user_id) === targetUserId);
+  }
+  // Randomize fallback
+  for (let i = reels.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [reels[i], reels[j]] = [reels[j], reels[i]];
   }
   return res.json(reels);
 });
@@ -3091,9 +3101,12 @@ app.get("/api/reels/:id", async (req: any, res: any) => {
   try {
     const [rows]: any = await dbQuery(`
       SELECT r.*,
+        COALESCE(NULLIF(u.username, ''), NULLIF(u.name, ''), NULLIF(r.author_name, ''), 'Animem.uz') as author_name,
+        COALESCE(NULLIF(u.avatar_url, ''), NULLIF(r.author_avatar, ''), 'https://files.catbox.moe/45hoi6.png') as author_avatar,
         (SELECT COUNT(*) FROM reel_comments WHERE reel_id = r.id) as comments_count,
         EXISTS(SELECT 1 FROM reel_likes WHERE reel_id = r.id AND user_identifier = ?) as is_liked
       FROM reels r
+      LEFT JOIN users u ON r.user_id = u.id
       WHERE r.id = ?
     `, [identifier, reelId]);
 
@@ -3101,6 +3114,8 @@ app.get("/api/reels/:id", async (req: any, res: any) => {
       const reel = rows[0];
       return res.json({
         ...reel,
+        author_name: reel.author_name || 'Animem.uz',
+        author_avatar: reel.author_avatar || 'https://files.catbox.moe/45hoi6.png',
         is_liked: Boolean(reel.is_liked),
         comments_count: Number(reel.comments_count || 0)
       });

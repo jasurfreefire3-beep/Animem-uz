@@ -198,7 +198,7 @@ export default function ReelsPlayer({
         onEnded={handleVideoEnded}
         onWaiting={() => setIsLoading(true)}
         onPlaying={() => setIsLoading(false)}
-        className="w-full h-full object-contain bg-black select-none"
+        className="w-full h-full object-cover bg-black select-none"
       />
 
       {/* Loading Spinner */}

@@ -15,7 +15,8 @@ import {
   Upload,
   Link as LinkIcon,
   Trash2,
-  Check
+  Check,
+  ArrowLeft
 } from 'lucide-react';
 import ReelsPlayer from '../components/ReelsPlayer';
 import ReelsCommentsModal from '../components/ReelsCommentsModal';
@@ -70,11 +71,20 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
           }
 
-          // Check if URL has ?id=... or similar
+          // Check if URL has ?id=... or /id=... or /123
+          let targetId: string | null = null;
           const params = new URLSearchParams(window.location.search);
-          const reelIdParam = params.get('id');
-          if (reelIdParam) {
-            const targetIdx = shuffled.findIndex((r) => String(r.id) === String(reelIdParam));
+          if (params.get('id')) {
+            targetId = params.get('id');
+          } else {
+            const match = window.location.pathname.match(/\/reels\/(?:id=)?([0-9]+)/i);
+            if (match) {
+              targetId = match[1];
+            }
+          }
+
+          if (targetId) {
+            const targetIdx = shuffled.findIndex((r) => String(r.id) === String(targetId));
             if (targetIdx !== -1) {
               // Move target to top
               const [targetReel] = shuffled.splice(targetIdx, 1);
@@ -100,7 +110,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
   useEffect(() => {
     if (reels.length > 0 && reels[activeIndex]) {
       const currentReel = reels[activeIndex];
-      const newUrl = `/reels?id=${currentReel.id}`;
+      const newUrl = `/reels/id=${currentReel.id}`;
       window.history.replaceState({ id: currentReel.id }, '', newUrl);
     }
   }, [activeIndex, reels]);
@@ -372,13 +382,26 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
   }
 
   return (
-    <div className="relative w-full h-[calc(100vh-65px)] md:h-[calc(100vh-70px)] bg-[#070709] overflow-hidden flex items-center justify-center">
+    <div className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center select-none">
       
-      {/* Top Floating Header for Mobile & Desktop */}
-      <div className="absolute top-3 left-0 right-0 z-40 px-4 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center space-x-2 bg-black/40 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 pointer-events-auto shadow-lg">
-          <Sparkles className="w-4 h-4 text-pink-400" />
-          <span className="text-sm font-bold tracking-wider text-white">REELS</span>
+      {/* Top Floating Header for Reels Navigation */}
+      <div className="absolute top-4 left-0 right-0 z-40 px-4 md:px-8 flex items-center justify-between pointer-events-none">
+        {/* Back to Home Button */}
+        <a
+          href="/"
+          className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-full backdrop-blur-md border border-white/15 shadow-xl pointer-events-auto transition-all cursor-pointer active:scale-95"
+          title="Bosh sahifaga qaytish"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-xs font-bold tracking-wide">Bosh sahifa</span>
+        </a>
+
+        {/* Brand Tag */}
+        <div className="flex items-center space-x-2 bg-black/60 backdrop-blur-md px-4 py-1.5 rounded-full border border-pink-500/30 pointer-events-auto shadow-xl">
+          <Sparkles className="w-4 h-4 text-pink-400 animate-pulse" />
+          <span className="text-xs md:text-sm font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">
+            REELS
+          </span>
         </div>
 
         {/* User / Admin Add Reel button */}
@@ -390,19 +413,20 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
             }
             setShowAddModal(true);
           }}
-          className="flex items-center space-x-1.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg pointer-events-auto transition-all active:scale-95 border border-pink-400/30 cursor-pointer"
+          className="flex items-center space-x-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-xl pointer-events-auto transition-all active:scale-95 border border-pink-400/30 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>Reel qo'shish</span>
+          <span className="hidden sm:inline">Video yuklash</span>
+          <span className="sm:hidden">Yuklash</span>
         </button>
       </div>
 
       {/* Desktop Up / Down Controls */}
-      <div className="hidden lg:flex flex-col space-y-3 absolute right-8 top-1/2 -translate-y-1/2 z-30">
+      <div className="hidden lg:flex flex-col space-y-3 absolute right-6 xl:right-10 top-1/2 -translate-y-1/2 z-30 pointer-events-auto">
         <button
           onClick={handlePrev}
           disabled={activeIndex === 0}
-          className="p-3 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/10 shadow-xl active:scale-95"
+          className="p-3 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/10 shadow-xl active:scale-95 cursor-pointer"
           title="Oldingi reel (Yuqoriga strelka)"
         >
           <ChevronUp className="w-6 h-6" />
@@ -410,7 +434,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
         <button
           onClick={handleNext}
           disabled={activeIndex === reels.length - 1}
-          className="p-3 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/10 shadow-xl active:scale-95"
+          className="p-3 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/10 shadow-xl active:scale-95 cursor-pointer"
           title="Keyingi reel (Pastga strelka)"
         >
           <ChevronDown className="w-6 h-6" />
@@ -420,7 +444,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
       {/* Main Snap Container */}
       <div
         ref={containerRef}
-        className="w-full h-full max-w-[430px] md:max-w-[420px] lg:max-w-[430px] mx-auto overflow-y-scroll snap-y snap-mandatory scrollbar-none flex flex-col relative"
+        className="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-none flex flex-col relative"
         style={{ scrollBehavior: 'smooth' }}
       >
         {reels.map((reel, index) => {
@@ -430,135 +454,167 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
             <div
               key={reel.id}
               data-index={index}
-              className="w-full h-full shrink-0 snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden"
+              className="w-full h-full shrink-0 snap-start snap-always relative bg-black flex items-center justify-center p-2 sm:p-4"
             >
-              {/* PlayerJS / Fallback Video Element */}
-              <ReelsPlayer
-                id={reel.id}
-                url={reel.video_url}
-                poster={reel.thumbnail_url}
-                title={reel.title}
-                isActive={isActive}
-                isMuted={isMuted}
-                onToggleMute={() => setIsMuted((prev) => !prev)}
-                onDoubleTapLike={() => handleToggleLike(reel.id)}
-              />
-
-              {/* Instagram-style Right Sidebar Actions */}
-              <div className="absolute right-3.5 bottom-20 z-30 flex flex-col items-center space-y-4">
-                {/* Author Avatar with Plus Badge */}
-                <div className="relative mb-1">
-                  <img
-                    src={reel.author_avatar || 'https://files.catbox.moe/45hoi6.png'}
-                    alt={reel.author_name}
-                    className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-xl"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = 'https://files.catbox.moe/45hoi6.png';
-                    }}
+              {/* Instagram Style Layout: Video Player + OUTSIDE Action Buttons on the Right */}
+              <div className="flex items-end justify-center gap-3 sm:gap-4 md:gap-5 h-full max-h-[92vh] pt-12 pb-3 relative">
+                
+                {/* 1. Video Player Container - Exact Video Aspect Ratio */}
+                <div className="relative h-full max-h-[86vh] aspect-[9/16] bg-black rounded-2xl overflow-hidden shadow-[0_10px_50px_rgba(0,0,0,0.9)] border border-white/10 flex items-center justify-center shrink-0">
+                  <ReelsPlayer
+                    id={reel.id}
+                    url={reel.video_url}
+                    poster={reel.thumbnail_url}
+                    title={reel.title}
+                    isActive={isActive}
+                    isMuted={isMuted}
+                    onToggleMute={() => setIsMuted((prev) => !prev)}
+                    onDoubleTapLike={() => handleToggleLike(reel.id)}
                   />
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-md">
-                    +
+
+                  {/* Video Metadata Overlay at bottom of player */}
+                  <div className="absolute left-0 right-0 bottom-0 p-4 pt-10 bg-gradient-to-t from-black/95 via-black/50 to-transparent pointer-events-none flex flex-col space-y-2 z-20">
+                    {/* Author & Anime Tag */}
+                    <div className="flex items-center space-x-2.5 pointer-events-auto">
+                      <a
+                        href={reel.user_id ? `/user/${reel.user_id}` : '#'}
+                        className="block shrink-0"
+                      >
+                        <img
+                          src={reel.author_avatar || 'https://files.catbox.moe/45hoi6.png'}
+                          alt={reel.author_name}
+                          className="w-8 h-8 rounded-full object-cover border-2 border-pink-500 shadow-md"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = 'https://files.catbox.moe/45hoi6.png';
+                          }}
+                        />
+                      </a>
+                      <div className="flex flex-col min-w-0">
+                        <a
+                          href={reel.user_id ? `/user/${reel.user_id}` : '#'}
+                          className="font-bold text-white text-sm drop-shadow-md hover:underline truncate cursor-pointer"
+                        >
+                          @{reel.author_name || 'Animem.uz'}
+                        </a>
+                      </div>
+                      {reel.anime_title && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-pink-500/30 text-pink-200 border border-pink-400/20 backdrop-blur-sm truncate max-w-[130px]">
+                          {reel.anime_title}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title and Hashtags */}
+                    <p className="text-white text-xs sm:text-sm font-medium leading-snug drop-shadow line-clamp-2 select-text pointer-events-auto">
+                      {reel.title}
+                    </p>
+
+                    {reel.tags && (
+                      <div className="flex flex-wrap gap-1.5 text-[11px] text-pink-300/90 font-medium">
+                        {reel.tags.split(' ').filter(Boolean).map((t, idx) => (
+                          <span key={idx}>{t}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Audio Ticker */}
+                    <div className="flex items-center space-x-2 text-white/80 text-[11px] font-medium pt-0.5 pointer-events-auto">
+                      <Music2 className="w-3.5 h-3.5 animate-pulse text-pink-400 shrink-0" />
+                      <span className="truncate">Asl audio - {reel.anime_title || reel.author_name || 'Animem.uz'}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Like Button */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleLike(reel.id)}
-                  className="flex flex-col items-center space-y-1 text-white group active:scale-90 transition-transform"
-                >
-                  <div className={`p-3 rounded-full backdrop-blur-md transition-colors ${
-                    reel.is_liked ? 'bg-pink-600/30 text-pink-500' : 'bg-black/40 hover:bg-black/60 text-white'
-                  }`}>
-                    <Heart
-                      className={`w-7 h-7 transition-colors ${
-                        reel.is_liked ? 'fill-pink-500 text-pink-500 animate-pulse' : 'text-white'
-                      }`}
-                    />
+                {/* 2. ACTION BUTTONS OUTSIDE THE PLAYER (Right Side!) */}
+                <div className="flex flex-col items-center space-y-4 pb-2 z-30 shrink-0 select-none">
+                  
+                  {/* Author Profile Picture (Outside player) */}
+                  <div className="relative mb-1 group">
+                    <a
+                      href={reel.user_id ? `/user/${reel.user_id}` : '#'}
+                      className="block relative active:scale-95 transition-transform"
+                      title={`@${reel.author_name} profili`}
+                    >
+                      <img
+                        src={reel.author_avatar || 'https://files.catbox.moe/45hoi6.png'}
+                        alt={reel.author_name}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-pink-500 shadow-xl group-hover:scale-105 transition-transform"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = 'https://files.catbox.moe/45hoi6.png';
+                        }}
+                      />
+                    </a>
                   </div>
-                  <span className="text-xs font-semibold drop-shadow-md">
-                    {formatCount(reel.likes_count)}
-                  </span>
-                </button>
 
-                {/* Comment Button */}
-                <button
-                  type="button"
-                  onClick={() => setActiveCommentsReel(reel)}
-                  className="flex flex-col items-center space-y-1 text-white group active:scale-90 transition-transform"
-                >
-                  <div className="p-3 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md transition-colors">
-                    <MessageCircle className="w-7 h-7 text-white" />
-                  </div>
-                  <span className="text-xs font-semibold drop-shadow-md">
-                    {formatCount(reel.comments_count)}
-                  </span>
-                </button>
-
-                {/* Share Button */}
-                <button
-                  type="button"
-                  onClick={() => setActiveShareReel(reel)}
-                  className="flex flex-col items-center space-y-1 text-white group active:scale-90 transition-transform"
-                >
-                  <div className="p-3 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md transition-colors">
-                    <Share2 className="w-7 h-7 text-white" />
-                  </div>
-                  <span className="text-xs font-semibold drop-shadow-md">
-                    {formatCount(reel.shares_count)}
-                  </span>
-                </button>
-
-                {/* Delete Button (Only for reel owner or admin) */}
-                {(currentUser?.role === 'admin' || (currentUser?.id && Number(reel.user_id) === Number(currentUser.id))) && (
+                  {/* Like Button */}
                   <button
                     type="button"
-                    onClick={() => handleDeleteReel(reel.id)}
-                    title="Reelni o'chirish"
-                    className="flex flex-col items-center space-y-1 text-red-400 hover:text-red-300 group active:scale-90 transition-transform"
+                    onClick={() => handleToggleLike(reel.id)}
+                    className="flex flex-col items-center space-y-1 text-white group active:scale-90 transition-transform cursor-pointer"
+                    title="Yoqdi"
                   >
-                    <div className="p-3 rounded-full bg-red-600/30 hover:bg-red-600/50 backdrop-blur-md border border-red-500/30 transition-colors">
-                      <Trash2 className="w-6 h-6 text-red-300" />
+                    <div className={`p-3 rounded-full backdrop-blur-md transition-all ${
+                      reel.is_liked ? 'bg-pink-600/40 text-pink-500 ring-2 ring-pink-500/50 shadow-[0_0_20px_rgba(236,72,153,0.5)]' : 'bg-white/10 hover:bg-white/20 text-white'
+                    }`}>
+                      <Heart
+                        className={`w-7 h-7 transition-all ${
+                          reel.is_liked ? 'fill-pink-500 text-pink-500 scale-110' : 'text-white'
+                        }`}
+                      />
                     </div>
-                    <span className="text-[10px] font-semibold drop-shadow-md text-red-200">
-                      O'chirish
+                    <span className="text-xs font-bold drop-shadow-md text-white/90">
+                      {formatCount(reel.likes_count)}
                     </span>
                   </button>
-                )}
-              </div>
 
-              {/* Bottom Metadata Overlay (Instagram Style) */}
-              <div className="absolute left-0 right-16 bottom-4 z-30 p-4 pt-8 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none flex flex-col space-y-2">
-                {/* Author Info & Tag */}
-                <div className="flex items-center space-x-2 pointer-events-auto">
-                  <span className="font-bold text-white text-sm drop-shadow-md hover:underline cursor-pointer">
-                    @{reel.author_name || 'Animem.uz'}
-                  </span>
-                  {reel.anime_title && (
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-pink-500/30 text-pink-200 border border-pink-400/20 backdrop-blur-sm truncate max-w-[150px]">
-                      {reel.anime_title}
+                  {/* Comment Button */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveCommentsReel(reel)}
+                    className="flex flex-col items-center space-y-1 text-white group active:scale-90 transition-transform cursor-pointer"
+                    title="Izohlar"
+                  >
+                    <div className="p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all">
+                      <MessageCircle className="w-7 h-7 text-white" />
+                    </div>
+                    <span className="text-xs font-bold drop-shadow-md text-white/90">
+                      {formatCount(reel.comments_count)}
                     </span>
+                  </button>
+
+                  {/* Share Button */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveShareReel(reel)}
+                    className="flex flex-col items-center space-y-1 text-white group active:scale-90 transition-transform cursor-pointer"
+                    title="Ulashish"
+                  >
+                    <div className="p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all">
+                      <Share2 className="w-7 h-7 text-white" />
+                    </div>
+                    <span className="text-xs font-bold drop-shadow-md text-white/90">
+                      {formatCount(reel.shares_count)}
+                    </span>
+                  </button>
+
+                  {/* Delete Button (Only for reel owner or admin) */}
+                  {(currentUser?.role === 'admin' || (currentUser?.id && Number(reel.user_id) === Number(currentUser.id))) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteReel(reel.id)}
+                      title="Reelni o'chirish"
+                      className="flex flex-col items-center space-y-1 text-red-400 hover:text-red-300 group active:scale-90 transition-transform cursor-pointer"
+                    >
+                      <div className="p-3 rounded-full bg-red-600/30 hover:bg-red-600/50 backdrop-blur-md border border-red-500/30 transition-all">
+                        <Trash2 className="w-6 h-6 text-red-300" />
+                      </div>
+                      <span className="text-[10px] font-semibold text-red-200">
+                        O'chirish
+                      </span>
+                    </button>
                   )}
                 </div>
 
-                {/* Title and Hashtags */}
-                <p className="text-white text-sm leading-snug drop-shadow-md line-clamp-2 select-text pointer-events-auto">
-                  {reel.title}
-                </p>
-
-                {reel.tags && (
-                  <div className="flex flex-wrap gap-1.5 text-xs text-pink-300/90 font-medium">
-                    {reel.tags.split(' ').filter(Boolean).map((t, idx) => (
-                      <span key={idx}>{t}</span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Audio Ticker */}
-                <div className="flex items-center space-x-2 text-white/80 text-xs font-medium pt-0.5 pointer-events-auto">
-                  <Music2 className="w-3.5 h-3.5 animate-pulse text-pink-400 shrink-0" />
-                  <span className="truncate">Asl audio - {reel.anime_title || 'Animem.uz'}</span>
-                </div>
               </div>
             </div>
           );
