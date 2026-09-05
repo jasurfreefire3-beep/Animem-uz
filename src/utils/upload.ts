@@ -6,10 +6,12 @@ async function parseApiResponse(res: Response, defaultErrorMsg: string) {
   try {
     data = JSON.parse(text);
   } catch (e) {
-    if (!res.ok || text.trim().startsWith("<") || text.includes("<!DOCTYPE")) {
-      throw new Error(defaultErrorMsg + " (Server xatosi yoki video hajmi juda katta)");
+    if (!res.ok) {
+      if (res.status === 413) {
+        throw new Error("Video hajmi server ruxsat bergan hajmdan katta (413). Iltimos 30 MB gacha bo'lgan video yuklang!");
+      }
+      throw new Error(defaultErrorMsg + ` (HTTP ${res.status})`);
     }
-    throw new Error(defaultErrorMsg);
   }
   if (!res.ok) {
     throw new Error(data.error || defaultErrorMsg);
@@ -155,7 +157,11 @@ export const uploadReelVideo = async (
   try {
     return await uploadReelDirect(file, token, onProgress);
   } catch (directErr: any) {
-    console.warn("Direct upload error, switching to chunked upload:", directErr?.message || directErr);
+    const errMsg = directErr?.message || "";
+    if (errMsg.includes("30 MB") || errMsg.includes("Maksimal") || errMsg.includes("hajm")) {
+      throw directErr;
+    }
+    console.warn("Direct upload fallback to chunked:", errMsg);
     return await uploadVideoInChunks(file, token, onProgress);
   }
 };

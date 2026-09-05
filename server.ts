@@ -90,8 +90,8 @@ app.get(["/health", "/api/health", "/ping"], (_req, res) => {
   res.status(200).send("OK");
 });
 
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use((req, res, next) => {
   if (req.url.startsWith("/api") || req.url.startsWith("/auth")) {
     console.log(`${req.method} ${req.url}`);
@@ -3361,7 +3361,7 @@ const activeReelUploads = new Map<string, {
 app.post("/api/reels/upload-direct", authenticateToken, upload.single("video"), async (req: any, res: any) => {
   try {
     const isAdmin = req.user?.role === "admin";
-    const maxUserSize = 15 * 1024 * 1024; // 15 MB
+    const maxUserSize = 30 * 1024 * 1024; // 30 MB
 
     if (!req.file) {
       return res.status(400).json({ error: "Video fayli tanlanmadi" });
@@ -3371,7 +3371,7 @@ app.post("/api/reels/upload-direct", authenticateToken, upload.single("video"), 
       const currentMB = (req.file.size / (1024 * 1024)).toFixed(1);
       try { fs.unlinkSync(req.file.path); } catch (e) {}
       return res.status(400).json({ 
-        error: `Maksimal video hajmi 15 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 15 MB dan kichik video yuklang!` 
+        error: `Maksimal video hajmi 30 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 30 MB dan kichik video yuklang!` 
       });
     }
 
@@ -3447,12 +3447,12 @@ app.post("/api/reels/upload-start", authenticateToken, (req: any, res: any) => {
   try {
   const { filename, totalSize, mimeType } = req.body;
   const isAdmin = req.user?.role === "admin";
-  const maxUserSize = 15 * 1024 * 1024; // 15 MB
+  const maxUserSize = 30 * 1024 * 1024; // 30 MB
 
   if (!isAdmin && totalSize > maxUserSize) {
     const currentMB = (totalSize / (1024 * 1024)).toFixed(1);
     return res.status(400).json({ 
-      error: `Oddiy foydalanuvchilar uchun maksimal video hajmi 15 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 15 MB dan kichik video yuklang!` 
+      error: `Oddiy foydalanuvchilar uchun maksimal video hajmi 30 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 30 MB dan kichik video yuklang!` 
     });
   }
 
@@ -3484,35 +3484,33 @@ app.post("/api/reels/upload-chunk", authenticateToken, upload.single("chunk"), (
   const { uploadId, chunkIndex, totalChunks } = req.body;
   const uploadInfo = activeReelUploads.get(uploadId);
   
-  if (!uploadInfo || uploadInfo.userId !== req.user.id) {
-    return res.status(404).json({ error: "Upload not found or expired" });
+  if (!uploadInfo || (uploadInfo.userId && req.user?.id && String(uploadInfo.userId) !== String(req.user.id))) {
+    return res.status(404).json({ error: "Yuklash jarayoni topilmadi yoki muddati o'tdi" });
   }
   if (!req.file) {
-    return res.status(400).json({ error: "Chunk missing" });
+    return res.status(400).json({ error: "Chunk fayl yetib kelmadi" });
   }
 
   uploadInfo.expectedChunks = Number(totalChunks);
   
-  const chunkBuffer = fs.readFileSync(req.file.path);
-  const startPos = Number(chunkIndex) * (1024 * 1024); // Assuming 1MB chunks (but client will send smaller, wait, client sends exact chunk, we can't assume offset unless we append sequentially or seek).
-  // Actually, append sequentially isn't safe if chunks arrive out of order.
-  // Better to write to file descriptor at specific offset.
-  
-  // To avoid complexity, we can write chunk to disk: `tempPath_chunkIndex`
+  const tempDir = path.dirname(uploadInfo.tempPath);
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
   const chunkPath = `${uploadInfo.tempPath}_${chunkIndex}`;
   try {
     fs.copyFileSync(req.file.path, chunkPath);
-    fs.unlinkSync(req.file.path);
+    try { fs.unlinkSync(req.file.path); } catch (e) {}
   } catch (e: any) {
-    // fallback if copy fails
-    fs.renameSync(req.file.path, chunkPath);
+    try { fs.renameSync(req.file.path, chunkPath); } catch (e2) {}
   }
   
   uploadInfo.receivedChunks.add(Number(chunkIndex));
   
   res.json({ success: true, progress: Math.round((uploadInfo.receivedChunks.size / uploadInfo.expectedChunks) * 100) });
   } catch (err: any) {
-    res.status(500).json({ error: "Chunk upload error: " + err.message });
+    res.status(500).json({ error: "Chunk yuklash xatosi: " + err.message });
   }
 });
 
@@ -3664,7 +3662,7 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
 
     const fileSize = req.file.size || 0;
     const isAdmin = req.user?.role === "admin";
-    const maxUserSize = 15 * 1024 * 1024; // 15 MB
+    const maxUserSize = 30 * 1024 * 1024; // 30 MB
 
     if (!isAdmin && fileSize > maxUserSize) {
       if (tempFilePath && fs.existsSync(tempFilePath)) {
@@ -3672,7 +3670,7 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
       }
       const currentMB = (fileSize / (1024 * 1024)).toFixed(1);
       return res.status(400).json({ 
-        error: `Oddiy foydalanuvchilar uchun maksimal video hajmi 15 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 15 MB dan kichik video yuklang!` 
+        error: `Oddiy foydalanuvchilar uchun maksimal video hajmi 30 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 30 MB dan kichik video yuklang!` 
       });
     }
 

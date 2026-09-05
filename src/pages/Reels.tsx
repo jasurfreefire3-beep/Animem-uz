@@ -278,10 +278,10 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
     }
 
     const isAdmin = currentUser?.role === 'admin';
-    const MAX_USER_SIZE = 15 * 1024 * 1024; // 15 MB
+    const MAX_USER_SIZE = 30 * 1024 * 1024; // 30 MB
     if (!isAdmin && file.size > MAX_USER_SIZE) {
       const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-      setAddError(`Oddiy foydalanuvchilar uchun maksimal video hajmi 15 MB. Siz tanlagan fayl hajmi: ${sizeMB} MB. Iltimos 15 MB dan kichik video tanlang!`);
+      setAddError(`Oddiy foydalanuvchilar uchun maksimal video hajmi 30 MB. Siz tanlagan fayl hajmi: ${sizeMB} MB. Iltimos 30 MB dan kichik video tanlang!`);
       return;
     }
 
@@ -659,13 +659,14 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
             setReels((prev) =>
               prev.map((r) =>
                 String(r.id) === String(activeCommentsReel.id)
-                  ? { ...r, comments_count: count }
+                  ? (r.comments_count === count ? r : { ...r, comments_count: count })
                   : r
               )
             );
-            setActiveCommentsReel((prev) =>
-              prev ? { ...prev, comments_count: count } : null
-            );
+            setActiveCommentsReel((prev) => {
+              if (!prev || prev.comments_count === count) return prev;
+              return { ...prev, comments_count: count };
+            });
           }}
         />
       )}
@@ -747,7 +748,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                     Video fayli *
                   </label>
                   <span className="text-[10px] text-pink-400 font-medium">
-                    {currentUser?.role === 'admin' ? "Admin: Hajm cheklovsiz" : "Maksimal: 15 MB"}
+                    {currentUser?.role === 'admin' ? "Admin: Hajm cheklovsiz" : "Maksimal: 30 MB"}
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">

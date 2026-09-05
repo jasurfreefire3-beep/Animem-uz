@@ -91,8 +91,8 @@ export default function UploadPage() {
   // Handle file selection
   const handleFileSelect = (selectedFile: File) => {
     setError(null);
-    const maxSizeBytes = user?.role === 'admin' ? 100 * 1024 * 1024 : 15 * 1024 * 1024;
-    const maxSizeMB = user?.role === 'admin' ? 100 : 15;
+    const maxSizeBytes = user?.role === 'admin' ? 100 * 1024 * 1024 : 30 * 1024 * 1024;
+    const maxSizeMB = user?.role === 'admin' ? 100 : 30;
 
     if (!selectedFile.type.startsWith('video/')) {
       setError("Faqat video formatidagi fayllarni yuklashingiz mumkin (MP4, WebM, MOV)");
@@ -383,7 +383,7 @@ export default function UploadPage() {
         {/* Requirements Badges */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-400 flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5" /> Max 15 MB
+            <ShieldCheck className="w-3.5 h-3.5" /> Max 30 MB
           </span>
           <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300">
             9:16 Vertikal
@@ -459,7 +459,7 @@ export default function UploadPage() {
                     </p>
                   </div>
                   <div className="text-[11px] text-white/40 space-y-0.5 pt-2">
-                    <p>• Maksimal hajm: <strong className="text-pink-400">15 MB</strong></p>
+                    <p>• Maksimal hajm: <strong className="text-pink-400">30 MB</strong></p>
                     <p>• Qo'llab-quvvatlanadi: MP4, WebM, MOV</p>
                     <p>• Tavsiya: 9:16 vertikal format</p>
                   </div>

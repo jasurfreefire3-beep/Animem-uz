@@ -255,10 +255,10 @@ export default function Profil() {
     }
 
     const isAdmin = currentUser?.role === 'admin';
-    const MAX_USER_SIZE = 15 * 1024 * 1024; // 15 MB
+    const MAX_USER_SIZE = 30 * 1024 * 1024; // 30 MB
     if (!isAdmin && file.size > MAX_USER_SIZE) {
       const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-      setReelUploadError(`Oddiy foydalanuvchilar uchun maksimal video hajmi 15 MB. Siz tanlagan fayl hajmi: ${sizeMB} MB. Iltimos 15 MB dan kichik video tanlang!`);
+      setReelUploadError(`Oddiy foydalanuvchilar uchun maksimal video hajmi 30 MB. Siz tanlagan fayl hajmi: ${sizeMB} MB. Iltimos 30 MB dan kichik video tanlang!`);
       return;
     }
 
@@ -1167,7 +1167,7 @@ export default function Profil() {
                 to="/upload"
                 className="inline-block bg-pink-600/20 hover:bg-pink-600 text-pink-300 hover:text-white border border-pink-500/30 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer"
               >
-                + Ilk Reel videoni yuklash (15 MB gacha)
+                + Ilk Reel videoni yuklash (30 MB gacha)
               </Link>
             )}
           </div>
@@ -1316,7 +1316,7 @@ export default function Profil() {
                       Video fayli *
                     </label>
                     <span className="text-[10px] text-pink-400 font-medium">
-                      {currentUser?.role === 'admin' ? "Admin: Cheksiz hajm" : "Maksimal: 15 MB"}
+                      {currentUser?.role === 'admin' ? "Admin: Cheksiz hajm" : "Maksimal: 30 MB"}
                     </span>
                   </div>
                   <label className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-pink-500/40 hover:border-pink-500 bg-pink-500/5 cursor-pointer transition-colors text-pink-300 text-xs text-center space-y-1">
@@ -1327,7 +1327,7 @@ export default function Profil() {
                     <span className="text-[10px] text-white/40">
                       {currentUser?.role === 'admin' 
                         ? "Adminlar uchun cheklovsiz video hajmi" 
-                        : "15 MB gacha bo'lgan video fayllar"}
+                        : "30 MB gacha bo'lgan video fayllar"}
                     </span>
                     <input
                       type="file"
