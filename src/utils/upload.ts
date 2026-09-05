@@ -1,4 +1,4 @@
-const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks for much faster uploads
+const CHUNK_SIZE = 512 * 1024; // 512KB chunks to stay safely under Nginx 1MB default limit
 
 async function parseApiResponse(res: Response, defaultErrorMsg: string) {
   const text = await res.text();
@@ -8,7 +8,7 @@ async function parseApiResponse(res: Response, defaultErrorMsg: string) {
   } catch (e) {
     if (!res.ok) {
       if (res.status === 413) {
-        throw new Error("Video hajmi server ruxsat bergan hajmdan katta (413). Iltimos 30 MB gacha bo'lgan video yuklang!");
+        throw new Error("HTTP_413_PAYLOAD_TOO_LARGE");
       }
       throw new Error(defaultErrorMsg + ` (HTTP ${res.status})`);
     }

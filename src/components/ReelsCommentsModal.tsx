@@ -175,7 +175,7 @@ export default function ReelsCommentsModal({
       onClick={onClose}
     >
       <div 
-        className="w-full sm:max-w-md h-[75vh] sm:h-[620px] bg-[#121217] border border-white/10 rounded-t-2xl sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden relative"
+        className="w-full sm:max-w-md h-[500px] sm:h-[620px] max-h-[85vh] bg-[#121217] border border-white/10 rounded-t-2xl sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
