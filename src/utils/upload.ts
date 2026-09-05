@@ -1,17 +1,39 @@
 async function parseApiResponse(res: Response, defaultErrorMsg: string) {
+  const contentType = res.headers.get("content-type") || "";
   const text = await res.text();
+
+  if (!text || !text.trim()) {
+    if (!res.ok) throw new Error(defaultErrorMsg);
+    return {};
+  }
+
+  const looksLikeHtml =
+    contentType.includes("text/html") ||
+    text.trim().startsWith("<") ||
+    text.includes("<!DOCTYPE") ||
+    text.includes("<html");
+
+  if (looksLikeHtml) {
+    if (res.status === 401) {
+      throw new Error("Tizimga kirish huquqi yo'q. Iltimos qayta kiring.");
+    }
+    if (res.status === 403) {
+      throw new Error("Sessiya yaroqsiz yoki muddati tugagan. Iltimos qayta kiring.");
+    }
+    throw new Error(defaultErrorMsg + " (Server HTML javob qaytardi. API yo'li yoki sessiya noto'g'ri bo'lishi mumkin.)");
+  }
+
   let data: any = {};
   try {
     data = JSON.parse(text);
   } catch (e) {
-    if (!res.ok || text.trim().startsWith("<") || text.includes("<!DOCTYPE")) {
-      throw new Error(defaultErrorMsg + " (Server xatosi yoki video hajmi juda katta)");
-    }
-    throw new Error(defaultErrorMsg);
+    throw new Error(defaultErrorMsg + " (Server noto'g'ri formatda javob qaytardi)");
   }
+
   if (!res.ok) {
     throw new Error(data.error || defaultErrorMsg);
   }
+
   return data;
 }
 

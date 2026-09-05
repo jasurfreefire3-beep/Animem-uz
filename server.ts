@@ -365,10 +365,14 @@ const io = new Server(server, {
 const authenticateToken = (req: any, res: any, next: any) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
-  if (!token) return res.sendStatus(401);
+  if (!token) {
+    return res.status(401).json({ error: "Tizimga kirish huquqi yo'q. Iltimos qayta kiring." });
+  }
 
   jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
-    if (err) return res.sendStatus(403);
+    if (err) {
+      return res.status(403).json({ error: "Sessiya yaroqsiz yoki muddati tugagan. Iltimos qayta kiring." });
+    }
     req.user = decoded;
     if (decoded && decoded.id) {
       dbQuery("UPDATE users SET last_seen = NOW() WHERE id = ?", [decoded.id]).catch(() => {});
