@@ -3530,13 +3530,6 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
       );
     } catch(dbErr) {
       console.error("PostgreSQL DB insert error:", dbErr);
-    }
-
-    let hlsUrl = `/api/video/${mediaId}`;
-    try {
-      hlsUrl = await convertVideoToHls(finalPath, mediaId);
-    } catch (hlsErr) {
-      console.error("HLS conversion error:", hlsErr);
     } finally {
       if (fs.existsSync(finalPath)) {
         try { fs.unlinkSync(finalPath); } catch (e) {}
@@ -3545,7 +3538,7 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
     
     activeReelUploads.delete(uploadId);
     
-    res.status(201).json({ url: hlsUrl, success: true });
+    res.status(201).json({ url: `/api/video/${mediaId}`, success: true });
     
   } catch (err: any) {
     console.error("HLS conversion error:", err);
@@ -3689,17 +3682,9 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
       try { fs.unlinkSync(tempFilePath); } catch (e) {}
     }
 
-    // Convert to HLS
-    let hlsUrl = `/api/video/${mediaId}`;
-    try {
-      hlsUrl = await convertVideoToHls(localDiskPath, mediaId);
-    } catch (hlsErr) {
-      console.error("HLS conversion error:", hlsErr);
-    }
-
     return res.status(201).json({
       success: true,
-      url: hlsUrl,
+      url: `/api/video/${mediaId}`,
       media_id: mediaId
     });
   } catch (err: any) {
