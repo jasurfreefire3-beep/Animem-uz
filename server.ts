@@ -783,7 +783,174 @@ async function testDbConnection() {
       await connection.query(`ALTER TABLE mangas MODIFY COLUMN banner_url LONGTEXT`);
     } catch (e) {}
 
-    console.log("Verified mangas, manga_chapters, comments, media_files and messages tables and columns in MySQL.");
+    // Ensure reels table in MySQL
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS reels (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          video_url LONGTEXT NOT NULL,
+          thumbnail_url LONGTEXT,
+          anime_title VARCHAR(255) DEFAULT '',
+          anime_id INT DEFAULT NULL,
+          author_name VARCHAR(100) DEFAULT 'Animem.uz',
+          author_avatar LONGTEXT,
+          likes_count INT DEFAULT 0,
+          views_count INT DEFAULT 0,
+          shares_count INT DEFAULT 0,
+          tags VARCHAR(255) DEFAULT '#anime #reels #animemuz',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
+      `);
+
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS reel_comments (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          reel_id INT NOT NULL,
+          user_id INT DEFAULT NULL,
+          username VARCHAR(100) NOT NULL,
+          user_avatar LONGTEXT,
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
+      `);
+
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS reel_likes (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          reel_id INT NOT NULL,
+          user_id INT DEFAULT NULL,
+          user_identifier VARCHAR(128) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_reel_user (reel_id, user_identifier)
+        ) ENGINE=InnoDB
+      `);
+
+      console.log("Verified reels, reel_comments, and reel_likes tables in MySQL.");
+
+      // Check if reels need initial seeding
+      const [existingReels]: any = await connection.query(`SELECT COUNT(*) as count FROM reels`);
+      if (existingReels && existingReels[0] && existingReels[0].count === 0) {
+        console.log("Seeding initial anime reels into MySQL database...");
+        const defaultReelsData = [
+          {
+            title: "Solo Leveling - Sung Jin-woo 'Qad rostla' (Arise) sahnasi! 🔥",
+            anime_title: "Solo Leveling",
+            video_url: "/ANIMEM_UZ_UZS_UNIVERSAL_15.mp4",
+            thumbnail_url: "https://m.media-amazon.com/images/M/MV5BODlhWOE5NjMtN2I0OC00NjA3LTkyM2YtM2I5Njg3MTBhYTY1XkEyXkFqcGc@._V1_.jpg",
+            author_name: "Animem.uz",
+            author_avatar: "https://files.catbox.moe/45hoi6.png",
+            likes_count: 1420,
+            views_count: 8530,
+            shares_count: 312,
+            tags: "#sololeveling #animeuz #arise #action"
+          },
+          {
+            title: "Jujutsu Kaisen - Gojo Satoru cheksiz bo'shliq 'Muryokusho' ⚡️",
+            anime_title: "Jujutsu Kaisen",
+            video_url: "/ANIMEM_UZ_UZS_CASINO_103.mp4",
+            thumbnail_url: "https://m.media-amazon.com/images/M/MV5BNGY4MTg3NjgtMmFkYi00ZTNmLTgwAVtLTExNmI0MDI0U3M4XkEyXkFqcGc@._V1_.jpg",
+            author_name: "Animem.uz",
+            author_avatar: "https://files.catbox.moe/45hoi6.png",
+            likes_count: 2890,
+            views_count: 14200,
+            shares_count: 674,
+            tags: "#gojo #jujutsukaisen #shibuya #anime"
+          },
+          {
+            title: "Demon Slayer - Tanjiro va Nezuko birlashgan olov nafasi! ⚔️",
+            anime_title: "Demon Slayer",
+            video_url: "/ANIMEM_UZ_UZS_SPORT_67.mp4",
+            thumbnail_url: "https://m.media-amazon.com/images/M/MV5BZjZjNzI5MDctY2Y4YS00NmM4LTljMmItZTFkOTExNGI3ODRhXkEyXkFqcGdeQXVyNjc3MjQzNTI@._V1_.jpg",
+            author_name: "Animem.uz",
+            author_avatar: "https://files.catbox.moe/45hoi6.png",
+            likes_count: 3450,
+            views_count: 19800,
+            shares_count: 890,
+            tags: "#demonslayer #kimetsunoyaiba #tanjiro #nezuko"
+          },
+          {
+            title: "Naruto Shippuden - Naruto va Kurama to'liq do'stlashgan lahza 🦊",
+            anime_title: "Naruto Shippuden",
+            video_url: "/ANIMEM_UZ_UZS_SPORT_61.mp4",
+            thumbnail_url: "https://m.media-amazon.com/images/M/MV5BZGFiMWFhNDAtMzUyZS00NmQ2LTljNDYtMmZjNTc5MDUxMzViXkEyXkFqcGc@._V1_.jpg",
+            author_name: "Animem.uz",
+            author_avatar: "https://files.catbox.moe/45hoi6.png",
+            likes_count: 4120,
+            views_count: 24500,
+            shares_count: 1205,
+            tags: "#naruto #kurama #hokage #uzbekcha"
+          },
+          {
+            title: "Attack on Titan - Eren Yeager 'Men oldinga intilaman' 💥",
+            anime_title: "Attack on Titan",
+            video_url: "/ANIMEM_UZ_UZS_SPORT_137.mp4",
+            thumbnail_url: "https://m.media-amazon.com/images/M/MV5BNzc5MTczNDQtNDFjNi00ZDU5LWFkNzItOTE1NzQzMzdhNzMxXkEyXkFqcGc@._V1_.jpg",
+            author_name: "Animem.uz",
+            author_avatar: "https://files.catbox.moe/45hoi6.png",
+            likes_count: 1980,
+            views_count: 11200,
+            shares_count: 450,
+            tags: "#aot #erenyeager #shingekinokyojin #anime"
+          },
+          {
+            title: "One Piece - Luffy Gear 5 Quyosh Xudosi Nika uyg'onishi! ☀️",
+            anime_title: "One Piece",
+            video_url: "/ANIMEM_UZ_UZS_SPORT_54.mp4",
+            thumbnail_url: "https://m.media-amazon.com/images/M/MV5BMTNjNGU4NTUtYmVjMy00YjRiLTkxMWUtNzZkMDNiYjZhNmViXkEyXkFqcGc@._V1_.jpg",
+            author_name: "Animem.uz",
+            author_avatar: "https://files.catbox.moe/45hoi6.png",
+            likes_count: 5310,
+            views_count: 31000,
+            shares_count: 1840,
+            tags: "#onepiece #luffy #gear5 #nika #anime"
+          },
+          {
+            title: "Bleach - Ichigo Kurosaki Getsuga Tenshou yangi o'lchami! ⚡️",
+            anime_title: "Bleach",
+            video_url: "/ANIMEM_UZ_UZS_SPORT_82.mp4",
+            thumbnail_url: "https://m.media-amazon.com/images/M/MV5BZjE0YjVjODQtZGY2NS00MDcyLThhMDAtZGQwMTZiOWNmNjRiXkEyXkFqcGc@._V1_.jpg",
+            author_name: "Animem.uz",
+            author_avatar: "https://files.catbox.moe/45hoi6.png",
+            likes_count: 1650,
+            views_count: 9400,
+            shares_count: 380,
+            tags: "#bleach #ichigo #bankai #tybw"
+          },
+          {
+            title: "Hunter x Hunter - Gon va Killua eng aqlbovar qilmas kuchi ⚡️",
+            anime_title: "Hunter x Hunter",
+            video_url: "/ANIMEM_UZ_UZS_CASINO_105.mp4",
+            thumbnail_url: "https://m.media-amazon.com/images/M/MV5BNGM0YTk3MWEtN2JlZC00ZmZmLWIwMDktZTA3MDNmODE2NDFiXkEyXkFqcGc@._V1_.jpg",
+            author_name: "Animem.uz",
+            author_avatar: "https://files.catbox.moe/45hoi6.png",
+            likes_count: 2240,
+            views_count: 13900,
+            shares_count: 520,
+            tags: "#hunterxhunter #gon #killua #animeclips"
+          }
+        ];
+
+        for (const item of defaultReelsData) {
+          await connection.query(
+            `INSERT INTO reels (title, anime_title, video_url, thumbnail_url, author_name, author_avatar, likes_count, views_count, shares_count, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [item.title, item.anime_title, item.video_url, item.thumbnail_url, item.author_name, item.author_avatar, item.likes_count, item.views_count, item.shares_count, item.tags]
+          );
+        }
+
+        // Add sample comments to first reel
+        await connection.query(
+          `INSERT INTO reel_comments (reel_id, username, user_avatar, content) VALUES 
+          (1, 'Otaku_King', 'https://files.catbox.moe/45hoi6.png', 'Eng zo\\'r sahna! Sung Jin-woo afsona 🔥'),
+          (1, 'AnimeGirl_Uz', 'https://files.catbox.moe/45hoi6.png', 'Har safar ko\\'rsam ham hayajon bosadi 😍'),
+          (2, 'GojoFan', 'https://files.catbox.moe/45hoi6.png', 'Gojo Satoru kuchi tengsiz ⚡️')`
+        );
+      }
+    } catch (e) {
+      console.warn("reels tables creation warning:", e);
+    }
+
+    console.log("Verified mangas, manga_chapters, comments, media_files, messages and reels tables and columns in MySQL.");
 
     connection.release();
   } catch (err) {
@@ -2658,6 +2825,539 @@ app.delete("/api/gifs/:id", authenticateToken, async (req: any, res: any) => {
   } catch (err: any) {
     console.error("Delete GIF error:", err);
     return res.status(500).json({ error: "GIF o'chirishda xatolik" });
+  }
+});
+
+// --- Reels Management Endpoints (Instagram-Style Vertical Video Feed) ---
+const STATIC_FALLBACK_REELS = [
+  {
+    id: 1,
+    title: "Solo Leveling - Sung Jin-woo 'Qad rostla' (Arise) sahnasi! 🔥",
+    anime_title: "Solo Leveling",
+    video_url: "/ANIMEM_UZ_UZS_UNIVERSAL_15.mp4",
+    thumbnail_url: "https://m.media-amazon.com/images/M/MV5BODlhWOE5NjMtN2I0OC00NjA3LTkyM2YtM2I5Njg3MTBhYTY1XkEyXkFqcGc@._V1_.jpg",
+    author_name: "Animem.uz",
+    author_avatar: "https://files.catbox.moe/45hoi6.png",
+    likes_count: 1420,
+    views_count: 8530,
+    shares_count: 312,
+    comments_count: 14,
+    tags: "#sololeveling #animeuz #arise #action",
+    created_at: new Date()
+  },
+  {
+    id: 2,
+    title: "Jujutsu Kaisen - Gojo Satoru cheksiz bo'shliq 'Muryokusho' ⚡️",
+    anime_title: "Jujutsu Kaisen",
+    video_url: "/ANIMEM_UZ_UZS_CASINO_103.mp4",
+    thumbnail_url: "https://m.media-amazon.com/images/M/MV5BNGY4MTg3NjgtMmFkYi00ZTNmLTgwAVtLTExNmI0MDI0U3M4XkEyXkFqcGc@._V1_.jpg",
+    author_name: "Animem.uz",
+    author_avatar: "https://files.catbox.moe/45hoi6.png",
+    likes_count: 2890,
+    views_count: 14200,
+    shares_count: 674,
+    comments_count: 28,
+    tags: "#gojo #jujutsukaisen #shibuya #anime",
+    created_at: new Date()
+  },
+  {
+    id: 3,
+    title: "Demon Slayer - Tanjiro va Nezuko birlashgan olov nafasi! ⚔️",
+    anime_title: "Demon Slayer",
+    video_url: "/ANIMEM_UZ_UZS_SPORT_67.mp4",
+    thumbnail_url: "https://m.media-amazon.com/images/M/MV5BZjZjNzI5MDctY2Y4YS00NmM4LTljMmItZTFkOTExNGI3ODRhXkEyXkFqcGdeQXVyNjc3MjQzNTI@._V1_.jpg",
+    author_name: "Animem.uz",
+    author_avatar: "https://files.catbox.moe/45hoi6.png",
+    likes_count: 3450,
+    views_count: 19800,
+    shares_count: 890,
+    comments_count: 42,
+    tags: "#demonslayer #kimetsunoyaiba #tanjiro #nezuko",
+    created_at: new Date()
+  },
+  {
+    id: 4,
+    title: "Naruto Shippuden - Naruto va Kurama to'liq do'stlashgan lahza 🦊",
+    anime_title: "Naruto Shippuden",
+    video_url: "/ANIMEM_UZ_UZS_SPORT_61.mp4",
+    thumbnail_url: "https://m.media-amazon.com/images/M/MV5BZGFiMWFhNDAtMzUyZS00NmQ2LTljNDYtMmZjNTc5MDUxMzViXkEyXkFqcGc@._V1_.jpg",
+    author_name: "Animem.uz",
+    author_avatar: "https://files.catbox.moe/45hoi6.png",
+    likes_count: 4120,
+    views_count: 24500,
+    shares_count: 1205,
+    comments_count: 59,
+    tags: "#naruto #kurama #hokage #uzbekcha",
+    created_at: new Date()
+  },
+  {
+    id: 5,
+    title: "Attack on Titan - Eren Yeager 'Men oldinga intilaman' 💥",
+    anime_title: "Attack on Titan",
+    video_url: "/ANIMEM_UZ_UZS_SPORT_137.mp4",
+    thumbnail_url: "https://m.media-amazon.com/images/M/MV5BNzc5MTczNDQtNDFjNi00ZDU5LWFkNzItOTE1NzQzMzdhNzMxXkEyXkFqcGc@._V1_.jpg",
+    author_name: "Animem.uz",
+    author_avatar: "https://files.catbox.moe/45hoi6.png",
+    likes_count: 1980,
+    views_count: 11200,
+    shares_count: 450,
+    comments_count: 19,
+    tags: "#aot #erenyeager #shingekinokyojin #anime",
+    created_at: new Date()
+  },
+  {
+    id: 6,
+    title: "One Piece - Luffy Gear 5 Quyosh Xudosi Nika uyg'onishi! ☀️",
+    anime_title: "One Piece",
+    video_url: "/ANIMEM_UZ_UZS_SPORT_54.mp4",
+    thumbnail_url: "https://m.media-amazon.com/images/M/MV5BMTNjNGU4NTUtYmVjMy00YjRiLTkxMWUtNzZkMDNiYjZhNmViXkEyXkFqcGc@._V1_.jpg",
+    author_name: "Animem.uz",
+    author_avatar: "https://files.catbox.moe/45hoi6.png",
+    likes_count: 5310,
+    views_count: 31000,
+    shares_count: 1840,
+    comments_count: 81,
+    tags: "#onepiece #luffy #gear5 #nika #anime",
+    created_at: new Date()
+  },
+  {
+    id: 7,
+    title: "Bleach - Ichigo Kurosaki Getsuga Tenshou yangi o'lchami! ⚡️",
+    anime_title: "Bleach",
+    video_url: "/ANIMEM_UZ_UZS_SPORT_82.mp4",
+    thumbnail_url: "https://m.media-amazon.com/images/M/MV5BZjE0YjVjODQtZGY2NS00MDcyLThhMDAtZGQwMTZiOWNmNjRiXkEyXkFqcGc@._V1_.jpg",
+    author_name: "Animem.uz",
+    author_avatar: "https://files.catbox.moe/45hoi6.png",
+    likes_count: 1650,
+    views_count: 9400,
+    shares_count: 380,
+    comments_count: 16,
+    tags: "#bleach #ichigo #bankai #tybw",
+    created_at: new Date()
+  },
+  {
+    id: 8,
+    title: "Hunter x Hunter - Gon va Killua eng aqlbovar qilmas kuchi ⚡️",
+    anime_title: "Hunter x Hunter",
+    video_url: "/ANIMEM_UZ_UZS_CASINO_105.mp4",
+    thumbnail_url: "https://m.media-amazon.com/images/M/MV5BNGM0YTk3MWEtN2JlZC00ZmZmLWIwMDktZTA3MDNmODE2NDFiXkEyXkFqcGc@._V1_.jpg",
+    author_name: "Animem.uz",
+    author_avatar: "https://files.catbox.moe/45hoi6.png",
+    likes_count: 2240,
+    views_count: 13900,
+    shares_count: 520,
+    comments_count: 34,
+    tags: "#hunterxhunter #gon #killua #animeclips",
+    created_at: new Date()
+  }
+];
+
+// Helper to extract client identifier (user id or client token/ip)
+function getClientIdentifier(req: any): { userId: number | null, identifier: string } {
+  let userId: number | null = null;
+  const authHeader = req.headers["authorization"];
+  if (authHeader) {
+    const token = authHeader.split(" ")[1];
+    if (token) {
+      try {
+        const decoded: any = jwt.verify(token, JWT_SECRET);
+        if (decoded?.id) userId = Number(decoded.id);
+      } catch (e) {}
+    }
+  }
+
+  const clientId = (req.headers["x-client-id"] as string) || (req.headers["x-forwarded-for"] as string) || req.ip || "anon_client";
+  const identifier = userId ? `user_${userId}` : `client_${clientId.toString().slice(0, 60)}`;
+  return { userId, identifier };
+}
+
+// 1. Get all Reels
+app.get("/api/reels", async (req: any, res: any) => {
+  res.setHeader("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+  const { userId, identifier } = getClientIdentifier(req);
+
+  try {
+    const [rows]: any = await dbQuery(`
+      SELECT r.*,
+        (SELECT COUNT(*) FROM reel_comments WHERE reel_id = r.id) as comments_count,
+        EXISTS(SELECT 1 FROM reel_likes WHERE reel_id = r.id AND user_identifier = ?) as is_liked
+      FROM reels r
+      ORDER BY r.id DESC
+    `, [identifier]);
+
+    if (Array.isArray(rows) && rows.length > 0) {
+      const formatted = rows.map((row: any) => ({
+        ...row,
+        is_liked: Boolean(row.is_liked),
+        comments_count: Number(row.comments_count || 0)
+      }));
+      return res.json(formatted);
+    }
+  } catch (err: any) {
+    console.warn("Fetch reels MySQL warning:", err?.message || err);
+  }
+
+  // Fallback to local store or static reels
+  const store = loadLocalStore();
+  const reels = (store.reels && store.reels.length > 0) ? store.reels : STATIC_FALLBACK_REELS;
+  return res.json(reels);
+});
+
+// 2. Get single Reel
+app.get("/api/reels/:id", async (req: any, res: any) => {
+  const reelId = req.params.id;
+  const { identifier } = getClientIdentifier(req);
+
+  try {
+    const [rows]: any = await dbQuery(`
+      SELECT r.*,
+        (SELECT COUNT(*) FROM reel_comments WHERE reel_id = r.id) as comments_count,
+        EXISTS(SELECT 1 FROM reel_likes WHERE reel_id = r.id AND user_identifier = ?) as is_liked
+      FROM reels r
+      WHERE r.id = ?
+    `, [identifier, reelId]);
+
+    if (rows && rows.length > 0) {
+      const reel = rows[0];
+      return res.json({
+        ...reel,
+        is_liked: Boolean(reel.is_liked),
+        comments_count: Number(reel.comments_count || 0)
+      });
+    }
+  } catch (err: any) {
+    console.warn("Fetch reel by id warning:", err?.message || err);
+  }
+
+  const fallback = STATIC_FALLBACK_REELS.find(r => String(r.id) === String(reelId)) || STATIC_FALLBACK_REELS[0];
+  return res.json(fallback);
+});
+
+// 3. Like / Unlike a Reel
+app.post("/api/reels/:id/like", async (req: any, res: any) => {
+  try {
+    const reelId = req.params.id;
+    if (!reelId) return res.status(400).json({ error: "Reel ID kiritilmadi" });
+
+    const { userId, identifier } = getClientIdentifier(req);
+
+    let liked = false;
+    let newLikesCount = 0;
+
+    try {
+      // Check if already liked
+      const [existing]: any = await dbQuery(
+        "SELECT id FROM reel_likes WHERE reel_id = ? AND user_identifier = ?",
+        [reelId, identifier]
+      );
+
+      if (existing && existing.length > 0) {
+        // Unlike
+        await dbQuery("DELETE FROM reel_likes WHERE id = ?", [existing[0].id]);
+        await dbQuery("UPDATE reels SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = ?", [reelId]);
+        liked = false;
+      } else {
+        // Like
+        await dbQuery(
+          "INSERT INTO reel_likes (reel_id, user_id, user_identifier) VALUES (?, ?, ?)",
+          [reelId, userId, identifier]
+        );
+        await dbQuery("UPDATE reels SET likes_count = likes_count + 1 WHERE id = ?", [reelId]);
+        liked = true;
+      }
+
+      const [updated]: any = await dbQuery("SELECT likes_count FROM reels WHERE id = ?", [reelId]);
+      if (updated && updated.length > 0) {
+        newLikesCount = Number(updated[0].likes_count);
+      }
+    } catch (dbErr: any) {
+      console.warn("DB like reel fallback:", dbErr?.message || dbErr);
+      liked = true;
+      newLikesCount = 100;
+    }
+
+    // Also update local store if present
+    const store = loadLocalStore();
+    if (store.reels) {
+      const rIndex = store.reels.findIndex((r: any) => String(r.id) === String(reelId));
+      if (rIndex !== -1) {
+        store.reels[rIndex].likes_count = (store.reels[rIndex].likes_count || 0) + (liked ? 1 : -1);
+        saveLocalStore(store);
+      }
+    }
+
+    return res.json({
+      success: true,
+      liked,
+      likes_count: newLikesCount
+    });
+  } catch (err: any) {
+    console.error("Like reel error:", err);
+    return res.status(500).json({ error: "Like bosishda xatolik yuz berdi" });
+  }
+});
+
+// 4. Get Comments for a Reel
+app.get("/api/reels/:id/comments", async (req: any, res: any) => {
+  try {
+    const reelId = req.params.id;
+    if (!reelId) return res.status(400).json({ error: "Reel ID kiritilmadi" });
+
+    try {
+      const [rows]: any = await dbQuery(
+        "SELECT * FROM reel_comments WHERE reel_id = ? ORDER BY id DESC",
+        [reelId]
+      );
+      if (Array.isArray(rows)) {
+        return res.json(rows);
+      }
+    } catch (dbErr: any) {
+      console.warn("DB get reel comments warning:", dbErr?.message || dbErr);
+    }
+
+    const store = loadLocalStore();
+    const comments = (store.reel_comments || []).filter((c: any) => String(c.reel_id) === String(reelId));
+    return res.json(comments);
+  } catch (err: any) {
+    console.error("Get reel comments error:", err);
+    return res.json([]);
+  }
+});
+
+// 5. Add Comment to a Reel
+app.post("/api/reels/:id/comments", async (req: any, res: any) => {
+  try {
+    const reelId = req.params.id;
+    if (!reelId) return res.status(400).json({ error: "Reel ID kiritilmadi" });
+
+    const { content, username, user_avatar } = req.body;
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: "Izoh matni bo'sh bo'lishi mumkin emas" });
+    }
+
+    const { userId } = getClientIdentifier(req);
+    let finalUsername = (username || "").trim();
+    let finalAvatar = user_avatar || "";
+
+    if (userId) {
+      try {
+        const [uRows]: any = await dbQuery("SELECT name, avatar_url FROM users WHERE id = ?", [userId]);
+        if (uRows && uRows.length > 0) {
+          finalUsername = uRows[0].name || finalUsername;
+          finalAvatar = uRows[0].avatar_url || finalAvatar;
+        }
+      } catch (e) {}
+    }
+
+    if (!finalUsername) {
+      finalUsername = "Anime Muxlisi #" + Math.floor(1000 + Math.random() * 9000);
+    }
+    if (!finalAvatar) {
+      finalAvatar = "https://files.catbox.moe/45hoi6.png";
+    }
+
+    const trimmedContent = content.trim();
+    let insertedId = Date.now();
+
+    try {
+      const [result]: any = await dbQuery(
+        "INSERT INTO reel_comments (reel_id, user_id, username, user_avatar, content) VALUES (?, ?, ?, ?, ?)",
+        [reelId, userId, finalUsername, finalAvatar, trimmedContent]
+      );
+      if (result?.insertId) insertedId = result.insertId;
+    } catch (dbErr: any) {
+      console.warn("DB insert reel comment warning:", dbErr?.message || dbErr);
+    }
+
+    const newComment = {
+      id: insertedId,
+      reel_id: reelId,
+      user_id: userId,
+      username: finalUsername,
+      user_avatar: finalAvatar,
+      content: trimmedContent,
+      created_at: new Date()
+    };
+
+    const store = loadLocalStore();
+    if (!store.reel_comments) store.reel_comments = [];
+    store.reel_comments.unshift(newComment);
+    saveLocalStore(store);
+
+    return res.status(201).json({
+      success: true,
+      comment: newComment
+    });
+  } catch (err: any) {
+    console.error("Add reel comment error:", err);
+    return res.status(500).json({ error: "Izoh yozishda xatolik yuz berdi" });
+  }
+});
+
+// 6. Increment Share count
+app.post("/api/reels/:id/share", async (req: any, res: any) => {
+  try {
+    const reelId = req.params.id;
+    if (!reelId) return res.status(400).json({ error: "Reel ID kiritilmadi" });
+
+    try {
+      await dbQuery("UPDATE reels SET shares_count = shares_count + 1 WHERE id = ?", [reelId]);
+    } catch (e) {}
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.json({ success: false });
+  }
+});
+
+// 7. Increment View count
+app.post("/api/reels/:id/view", async (req: any, res: any) => {
+  try {
+    const reelId = req.params.id;
+    if (!reelId) return res.status(400).json({ error: "Reel ID kiritilmadi" });
+
+    try {
+      await dbQuery("UPDATE reels SET views_count = views_count + 1 WHERE id = ?", [reelId]);
+    } catch (e) {}
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.json({ success: false });
+  }
+});
+
+// 8. Create new Reel (Admin only)
+app.post("/api/reels", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Faqat admin yangi reel qo'sha oladi" });
+    }
+
+    const { title, anime_title, video_url, thumbnail_url, tags } = req.body;
+    if (!video_url || !video_url.trim()) {
+      return res.status(400).json({ error: "Video URL kiritilishi shart" });
+    }
+
+    const reelTitle = (title || "").trim() || "Anime Reel";
+    const animeName = (anime_title || "").trim() || "Anime";
+    const trimmedVideo = video_url.trim();
+    const trimmedThumb = (thumbnail_url || "").trim() || "https://files.catbox.moe/45hoi6.png";
+    const reelTags = (tags || "").trim() || "#anime #reels #animemuz";
+
+    let insertedId = Date.now();
+    try {
+      const [result]: any = await dbQuery(
+        `INSERT INTO reels (title, anime_title, video_url, thumbnail_url, author_name, author_avatar, likes_count, views_count, shares_count, tags)
+         VALUES (?, ?, ?, ?, 'Animem.uz', 'https://files.catbox.moe/45hoi6.png', 0, 0, 0, ?)`,
+        [reelTitle, animeName, trimmedVideo, trimmedThumb, reelTags]
+      );
+      if (result?.insertId) insertedId = result.insertId;
+    } catch (dbErr: any) {
+      console.warn("DB insert reel warning:", dbErr?.message || dbErr);
+    }
+
+    const newReel = {
+      id: insertedId,
+      title: reelTitle,
+      anime_title: animeName,
+      video_url: trimmedVideo,
+      thumbnail_url: trimmedThumb,
+      author_name: "Animem.uz",
+      author_avatar: "https://files.catbox.moe/45hoi6.png",
+      likes_count: 0,
+      views_count: 0,
+      shares_count: 0,
+      comments_count: 0,
+      tags: reelTags,
+      is_liked: false,
+      created_at: new Date()
+    };
+
+    const store = loadLocalStore();
+    if (!store.reels) store.reels = [...STATIC_FALLBACK_REELS];
+    store.reels.unshift(newReel);
+    saveLocalStore(store);
+
+    return res.status(201).json({
+      success: true,
+      reel: newReel
+    });
+  } catch (err: any) {
+    console.error("Create reel error:", err);
+    return res.status(500).json({ error: "Reel yaratishda xatolik yuz berdi" });
+  }
+});
+
+// 9. Delete Reel (Admin only)
+app.delete("/api/reels/:id", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Faqat admin o'chira oladi" });
+    }
+
+    const reelId = req.params.id;
+    if (!reelId) return res.status(400).json({ error: "Reel ID kiritilmadi" });
+
+    try {
+      await dbQuery("DELETE FROM reel_comments WHERE reel_id = ?", [reelId]);
+      await dbQuery("DELETE FROM reel_likes WHERE reel_id = ?", [reelId]);
+      await dbQuery("DELETE FROM reels WHERE id = ?", [reelId]);
+    } catch (dbErr: any) {
+      console.warn("DB delete reel warning:", dbErr?.message || dbErr);
+    }
+
+    const store = loadLocalStore();
+    if (store.reels) {
+      store.reels = store.reels.filter((r: any) => String(r.id) !== String(reelId));
+      saveLocalStore(store);
+    }
+
+    return res.json({ success: true, message: "Reel muvaffaqiyatli o'chirildi" });
+  } catch (err: any) {
+    console.error("Delete reel error:", err);
+    return res.status(500).json({ error: "Reel o'chirishda xatolik yuz berdi" });
+  }
+});
+
+// 10. Upload Reel Video directly to MySQL media_files (Admin only)
+app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Faqat admin video yuklay oladi" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Video fayl tanlanmagan" });
+    }
+
+    const fileBuffer = req.file.buffer;
+    const filename = req.file.originalname || "reel.mp4";
+    const mimeType = req.file.mimetype || "video/mp4";
+    const fileSize = req.file.size;
+    const base64String = fileBuffer.toString("base64");
+    const mediaId = "reel_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+
+    try {
+      await dbQuery(
+        `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?)`,
+        [mediaId, filename, mimeType, base64String, fileSize]
+      );
+    } catch (e: any) {
+      console.warn("media_files reel insert warning:", e?.message || e);
+    }
+
+    // Cache in RAM
+    mediaMemoryCache.set(mediaId, { mimeType, base64: base64String, buffer: fileBuffer });
+    const mediaUrl = `/api/media/${mediaId}`;
+
+    return res.status(201).json({
+      success: true,
+      url: mediaUrl,
+      media_id: mediaId
+    });
+  } catch (err: any) {
+    console.error("Upload reel video error:", err);
+    return res.status(500).json({ error: "Video faylni yuklashda xatolik yuz berdi" });
   }
 });
 

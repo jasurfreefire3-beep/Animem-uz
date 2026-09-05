@@ -221,4 +221,32 @@ export function toSlug(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+export interface ReelComment {
+  id: number | string;
+  reel_id: number | string;
+  user_id?: number | string;
+  username: string;
+  user_avatar?: string;
+  content: string;
+  created_at: string;
+}
+
+export interface Reel {
+  id: number | string;
+  title: string;
+  video_url: string;
+  thumbnail_url?: string;
+  anime_title?: string;
+  anime_id?: number | string;
+  author_name: string;
+  author_avatar?: string;
+  likes_count: number;
+  views_count: number;
+  shares_count: number;
+  comments_count?: number;
+  tags?: string;
+  is_liked?: boolean;
+  created_at: string;
+}
+
 

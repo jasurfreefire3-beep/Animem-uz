@@ -36,6 +36,8 @@ export interface Translations {
   navAnimes: string;
   navManga: string;
   navDramas: string;
+  navReels: string;
+  reels: string;
   navDonat: string;
   navSchedule: string;
   navNewReleases: string;
@@ -235,6 +237,8 @@ export const translations: Record<Language, Translations> = {
     navAnimes: "Animelar",
     navManga: "Mangalar",
     navDramas: "Dramalar",
+    navReels: "Reels",
+    reels: "Reels",
     navDonat: "Donat",
     navSchedule: "Jadval",
     navNewReleases: "Yangi chiqishlar",
@@ -422,6 +426,8 @@ export const translations: Record<Language, Translations> = {
     navAnimes: "Аниме",
     navManga: "Манга",
     navDramas: "Дорамы",
+    navReels: "Рилс",
+    reels: "Рилс",
     navDonat: "Донат",
     navSchedule: "Расписание",
     navNewReleases: "Новинки",
@@ -609,6 +615,8 @@ export const translations: Record<Language, Translations> = {
     navAnimes: "Anime",
     navManga: "Manga",
     navDramas: "Dramas",
+    navReels: "Reels",
+    reels: "Reels",
     navDonat: "Donate",
     navSchedule: "Schedule",
     navNewReleases: "New Releases",

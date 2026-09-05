@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Notification, Anime, toSlug } from '../types';
-import { Search, LogOut, User, Bell, Menu, PlusCircle, Heart, Bookmark, Settings, X, Shield, Star, Film, Globe } from 'lucide-react';
+import { Search, LogOut, User, Bell, Menu, PlusCircle, Heart, Bookmark, Settings, X, Shield, Star, Film, Globe, Clapperboard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   getNotificationPermission, 
@@ -340,6 +340,17 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
       {/* Right side: Actions & Profile */}
       <div className="flex items-center space-x-1 min-[400px]:space-x-2 md:space-x-3.5 shrink-0">
         
+        {/* Reels Quick Nav Button */}
+        <Link
+          to={getLocalizedPath('/reels')}
+          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-pink-500/20 to-purple-500/20 hover:from-pink-500/30 hover:to-purple-500/30 border border-pink-500/40 text-pink-300 hover:text-white text-xs font-bold transition-all active:scale-95 shadow-sm"
+          title="Anime Reels"
+        >
+          <Clapperboard size={14} className="text-pink-400" />
+          <span className="font-extrabold tracking-wide">REELS</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse" />
+        </Link>
+
         {/* Mobile Search Icon */}
         <button 
           onClick={() => setShowMobileSearch(true)} 

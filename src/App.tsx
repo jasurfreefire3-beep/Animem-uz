@@ -40,6 +40,7 @@ const Profil = lazy(() => import('./pages/Profil'));
 const Donat = lazy(() => import('./pages/Donat'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const SupportBot = lazy(() => import('./pages/SupportBot'));
+const Reels = lazy(() => import('./pages/Reels'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const DMCA = lazy(() => import('./pages/DMCA'));
@@ -244,6 +245,10 @@ export default function App() {
               <Route path="/:lang/dramalar" element={<Dramas />} />
               <Route path="/drama/:id" element={<DramaView />} />
               <Route path="/:lang/drama/:id" element={<DramaView />} />
+
+              {/* Reels Routes */}
+              <Route path="/reels" element={<Reels />} />
+              <Route path="/:lang/reels" element={<Reels />} />
 
               <Route path="/jadval" element={<Jadval />} />
               <Route path="/:lang/jadval" element={<Jadval />} />
