@@ -1,5 +1,22 @@
 const CHUNK_SIZE = 512 * 1024; // 512KB to bypass Nginx 1M limits
 
+async function parseApiResponse(res: Response, defaultErrorMsg: string) {
+  const text = await res.text();
+  let data: any = {};
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    if (!res.ok || text.trim().startsWith("<") || text.includes("<!DOCTYPE")) {
+      throw new Error(defaultErrorMsg + " (Server xatosi yoki sessiya eskirgan)");
+    }
+    throw new Error(defaultErrorMsg);
+  }
+  if (!res.ok) {
+    throw new Error(data.error || defaultErrorMsg);
+  }
+  return data;
+}
+
 export const uploadVideoInChunks = async (
   file: File, 
   token: string, 
@@ -20,12 +37,8 @@ export const uploadVideoInChunks = async (
     })
   });
   
-  if (!startRes.ok) {
-    const errorData = await startRes.json();
-    throw new Error(errorData.error || "Video yuklashni boshlashda xatolik");
-  }
-  
-  const { uploadId } = await startRes.json();
+  const startData = await parseApiResponse(startRes, "Video yuklashni boshlashda xatolik");
+  const { uploadId } = startData;
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
   
   // 2. Upload chunks sequentially
@@ -46,10 +59,7 @@ export const uploadVideoInChunks = async (
       body: formData
     });
     
-    if (!chunkRes.ok) {
-      const errorData = await chunkRes.json();
-      throw new Error(errorData.error || "Chunk yuklashda xatolik");
-    }
+    await parseApiResponse(chunkRes, "Chunk yuklashda xatolik");
     
     const progress = Math.round(((i + 1) / totalChunks) * 100);
     // Don't reach 100 yet, because processing takes time
@@ -58,7 +68,7 @@ export const uploadVideoInChunks = async (
   }
   
   // 3. Finish and convert
-  onProgress(99, "Video FFmpeg orqali HLS formatga o'tkazilmoqda. Kuting...");
+  onProgress(99, "Video formatga o'tkazilmoqda va bazaga saqlanmoqda. Kuting...");
   const finishRes = await fetch("/api/reels/upload-finish", {
     method: "POST",
     headers: {
@@ -68,12 +78,7 @@ export const uploadVideoInChunks = async (
     body: JSON.stringify({ uploadId })
   });
   
-  if (!finishRes.ok) {
-    const errorData = await finishRes.json();
-    throw new Error(errorData.error || "Videoni HLS formatiga o'tkazishda xatolik");
-  }
-  
-  const data = await finishRes.json();
+  const finishData = await parseApiResponse(finishRes, "Videoni saqlashda xatolik");
   onProgress(100, "Muvaffaqiyatli yakunlandi!");
-  return data.url;
+  return finishData.url;
 };
