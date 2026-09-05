@@ -3499,30 +3499,7 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
     
     await new Promise((resolve) => writeStream.on("finish", resolve));
     
-    // Now convert to HLS via ffmpeg
-    if (!fs.existsSync(hlsDir)) {
-      fs.mkdirSync(hlsDir, { recursive: true });
-    }
     
-    const hlsPlaylistPath = path.join(hlsDir, 'video.m3u8');
-    
-    await new Promise((resolve, reject) => {
-      ffmpeg(finalPath)
-        .outputOptions([
-          '-profile:v baseline',
-          '-level 3.0',
-          '-start_number 0',
-          '-hls_time 10',
-          '-hls_list_size 0',
-          '-f hls'
-        ])
-        .output(hlsPlaylistPath)
-        .on('end', resolve)
-        .on('error', reject)
-        .run();
-    });
-    
-    // Once done, delete finalPath (the raw mp4) to save space, or keep it. Let's keep it just in case, or delete. User asked for mp4 and hls.
     // "mp4 bolib yuklansin ffpmeg orqali hls namoish etilsin" (upload as mp4, show as hls via ffmpeg).
 
     const mediaId = uploadId;
