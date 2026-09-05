@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Volume2, VolumeX, Play } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, Loader2 } from 'lucide-react';
+import Hls from 'hls.js';
 
 interface ReelsPlayerProps {
   id: string | number;
@@ -12,28 +13,6 @@ interface ReelsPlayerProps {
   onDoubleTapLike?: () => void;
 }
 
-function ensurePlayerJsLoaded(): Promise<void> {
-  if (typeof window !== 'undefined' && window.Playerjs) {
-    return Promise.resolve();
-  }
-
-  return new Promise((resolve) => {
-    const existing = document.querySelector<HTMLScriptElement>('script[data-playerjs-reels]');
-    if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = '/playerjs.js';
-    script.async = true;
-    script.dataset.playerjsReels = 'true';
-    script.onload = () => resolve();
-    script.onerror = () => resolve(); // fallback to native video if error
-    document.head.appendChild(script);
-  });
-}
-
 export default function ReelsPlayer({
   id,
   url,
@@ -44,124 +23,121 @@ export default function ReelsPlayer({
   onToggleMute,
   onDoubleTapLike,
 }: ReelsPlayerProps) {
-  const containerId = useRef(`playerjs-reel-${id}-${Math.random().toString(36).substring(2, 7)}`).current;
-  const playerRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showPlayIcon, setShowPlayIcon] = useState<boolean>(false);
   const [showHeartAnim, setShowHeartAnim] = useState<boolean>(false);
-  const [useFallback, setUseFallback] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
   const lastTapTimeRef = useRef<number>(0);
 
-  // Initialize Playerjs or fallback
+  // Initialize HLS or standard video source
   useEffect(() => {
-    let isCurrent = true;
+    const video = videoRef.current;
+    if (!video) return;
 
-    ensurePlayerJsLoaded().then(() => {
-      if (!isCurrent) return;
+    let hls: Hls | null = null;
+    setIsLoading(true);
 
-      if (window.Playerjs && document.getElementById(containerId)) {
-        try {
-          const container = document.getElementById(containerId);
-          if (container) {
-            container.replaceChildren();
-          }
+    const isHlsUrl = url.endsWith('.m3u8') || url.includes('/hls/');
 
-          playerRef.current = new window.Playerjs({
-            id: containerId,
-            file: url,
-            poster: poster || '',
-            title: title || 'Anime Reel',
-            autoplay: isActive ? 1 : 0,
-            loop: 1,
-            volume: isMuted ? 0 : 80,
-            theme: '#ff006a',
-            download: 0,
-            filedownload: 0,
-          });
-
-          // Wait a tick then handle play state
-          setTimeout(() => {
-            if (!isCurrent) return;
-            try {
-              if (isActive) {
-                playerRef.current?.api?.('play');
-                setIsPlaying(true);
-              } else {
-                playerRef.current?.api?.('pause');
-                setIsPlaying(false);
-              }
-            } catch (e) {}
-          }, 150);
-        } catch (err) {
-          console.warn('Playerjs reel initialization fallback to native video', err);
-          setUseFallback(true);
+    if (isHlsUrl && Hls.isSupported()) {
+      hls = new Hls({
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setIsLoading(false);
+        if (isActive) {
+          video.play().then(() => setIsPlaying(true)).catch(() => {});
         }
-      } else {
-        setUseFallback(true);
+      });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              hls?.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              hls?.recoverMediaError();
+              break;
+            default:
+              hls?.destroy();
+              break;
+          }
+        }
+      });
+    } else {
+      // Native video source (MP4 / /api/video/:id)
+      video.src = url;
+      video.load();
+      setIsLoading(false);
+      if (isActive) {
+        video.play().then(() => setIsPlaying(true)).catch(() => {});
       }
-    });
+    }
 
     return () => {
-      isCurrent = false;
-      try {
-        playerRef.current?.api?.('stop');
-      } catch (e) {}
-      playerRef.current = null;
-    };
-  }, [url, containerId, poster, title]);
-
-  // Handle active slide transitions
-  useEffect(() => {
-    if (useFallback && videoRef.current) {
-      if (isActive) {
-        videoRef.current.currentTime = 0;
-        videoRef.current.play().catch(() => {});
-        setIsPlaying(true);
-      } else {
-        videoRef.current.pause();
-        setIsPlaying(false);
+      if (hls) {
+        hls.destroy();
       }
-      return;
-    }
+      if (video) {
+        video.pause();
+        video.src = '';
+      }
+    };
+  }, [url]);
 
-    if (playerRef.current?.api) {
-      try {
-        if (isActive) {
-          playerRef.current.api('play');
-          setIsPlaying(true);
-        } else {
-          playerRef.current.api('pause');
-          setIsPlaying(false);
-        }
-      } catch (e) {}
+  // Handle active slide play/pause state
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isActive) {
+      video.currentTime = 0;
+      video.play().then(() => {
+        setIsPlaying(true);
+      }).catch((err) => {
+        console.warn("Autoplay blocked or failed:", err);
+        setIsPlaying(false);
+      });
+    } else {
+      video.pause();
+      setIsPlaying(false);
     }
-  }, [isActive, useFallback]);
+  }, [isActive]);
 
   // Handle mute changes
   useEffect(() => {
-    if (useFallback && videoRef.current) {
-      videoRef.current.muted = isMuted;
-      return;
-    }
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = isMuted;
+  }, [isMuted]);
 
-    if (playerRef.current?.api) {
-      try {
-        if (isMuted) {
-          playerRef.current.api('mute');
-        } else {
-          playerRef.current.api('unmute');
-          playerRef.current.api('volume', 80);
-        }
-      } catch (e) {}
-    }
-  }, [isMuted, useFallback]);
+  // Time update for progress bar
+  const handleTimeUpdate = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const current = video.currentTime;
+    const dur = video.duration || 1;
+    setProgress((current / dur) * 100);
+    setDuration(dur);
+  };
+
+  const handleVideoEnded = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = 0;
+    video.play().catch(() => {});
+  };
 
   const handleTapOrClick = () => {
     const now = Date.now();
     // Double tap detector (300ms)
     if (now - lastTapTimeRef.current < 300) {
-      // Double tap -> trigger like
       if (onDoubleTapLike) {
         onDoubleTapLike();
         setShowHeartAnim(true);
@@ -173,68 +149,49 @@ export default function ReelsPlayer({
     lastTapTimeRef.current = now;
 
     // Single tap -> toggle play / pause
-    if (useFallback && videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play().catch(() => {});
-        setIsPlaying(true);
-      } else {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      }
-      setShowPlayIcon(true);
-      setTimeout(() => setShowPlayIcon(false), 600);
-      return;
-    }
+    const video = videoRef.current;
+    if (!video) return;
 
-    if (playerRef.current?.api) {
-      try {
-        if (isPlaying) {
-          playerRef.current.api('pause');
-          setIsPlaying(false);
-        } else {
-          playerRef.current.api('play');
-          setIsPlaying(true);
-        }
-        setShowPlayIcon(true);
-        setTimeout(() => setShowPlayIcon(false), 600);
-      } catch (e) {}
+    if (video.paused) {
+      video.play().then(() => setIsPlaying(true)).catch(() => {});
+    } else {
+      video.pause();
+      setIsPlaying(false);
     }
+    setShowPlayIcon(true);
+    setTimeout(() => setShowPlayIcon(false), 600);
   };
 
   return (
     <div 
-      className="relative w-full h-full bg-black overflow-hidden select-none flex items-center justify-center"
+      className="relative w-full h-full bg-black overflow-hidden select-none flex items-center justify-center cursor-pointer"
       onClick={handleTapOrClick}
       onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
     >
-      {/* PlayerJS Container */}
-      {!useFallback ? (
-        <div
-          id={containerId}
-          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          className="w-full h-full flex items-center justify-center [&_video]:object-cover [&_video]:w-full [&_video]:h-full select-none"
-          style={{ width: '100%', height: '100%' }}
-        />
-      ) : (
-        <video
-          ref={videoRef}
-          src={url}
-          poster={poster}
-          playsInline
-          loop
-          muted={isMuted}
-          controlsList="nodownload noplaybackrate nofullscreen"
-          disablePictureInPicture
-          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          className="w-full h-full object-cover pointer-events-none select-none"
-        />
+      {/* Video Element */}
+      <video
+        ref={videoRef}
+        poster={poster}
+        playsInline
+        loop
+        muted={isMuted}
+        preload="auto"
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleVideoEnded}
+        onWaiting={() => setIsLoading(true)}
+        onPlaying={() => setIsLoading(false)}
+        className="w-full h-full object-cover select-none"
+      />
+
+      {/* Loading Spinner */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none z-20">
+          <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
+        </div>
       )}
 
-      {/* Invisible protective click overlay */}
-      <div 
-        className="absolute inset-0 z-10 select-none" 
-        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      />
+      {/* Invisible protective overlay */}
+      <div className="absolute inset-0 z-10 pointer-events-none" />
 
       {/* Floating Mute/Unmute Button in top right */}
       <button
@@ -243,7 +200,7 @@ export default function ReelsPlayer({
           e.stopPropagation();
           onToggleMute();
         }}
-        className="absolute top-4 right-4 z-30 p-2.5 rounded-full bg-black/50 backdrop-blur-md text-white hover:bg-black/70 transition-all shadow-lg active:scale-95"
+        className="absolute top-4 right-4 z-30 p-2.5 rounded-full bg-black/50 backdrop-blur-md text-white hover:bg-black/70 transition-all shadow-lg active:scale-95 cursor-pointer"
         title={isMuted ? "Ovozni yoqish" : "Ovozni o'chirish"}
         aria-label="Toggle mute"
       >
@@ -257,16 +214,13 @@ export default function ReelsPlayer({
             {isPlaying ? (
               <Play className="w-8 h-8 fill-white translate-x-0.5" />
             ) : (
-              <div className="flex space-x-1.5">
-                <div className="w-2.5 h-7 bg-white rounded-sm"></div>
-                <div className="w-2.5 h-7 bg-white rounded-sm"></div>
-              </div>
+              <Pause className="w-8 h-8 fill-white" />
             )}
           </div>
         </div>
       )}
 
-      {/* Instagram-style Big Heart animation on double tap */}
+      {/* Big Heart animation on double tap */}
       {showHeartAnim && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
           <svg
@@ -277,6 +231,14 @@ export default function ReelsPlayer({
           </svg>
         </div>
       )}
+
+      {/* Bottom Progress Bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20 z-30 pointer-events-none">
+        <div 
+          className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-100"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
     </div>
   );
 }
