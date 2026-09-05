@@ -3520,53 +3520,45 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
     // "mp4 bolib yuklansin ffpmeg orqali hls namoish etilsin" (upload as mp4, show as hls via ffmpeg).
 
     // Upload combined mp4 to Catbox.moe for instant high-speed streaming
-    let catboxUrl = `/api/video/${uploadId}`;
+    let catboxUrl = `/api/reels/stream/${uploadId}/video.mp4`;
     try {
       const fileBuffer = fs.readFileSync(finalPath);
-      const boundary = "------------------" + Math.random().toString(16);
       
-      let header = `--${boundary}\r\n`;
-      header += `Content-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n`;
-      header += `--${boundary}\r\n`;
-      header += `Content-Disposition: form-data; name="fileToUpload"; filename="video.mp4"\r\n`;
-      header += `Content-Type: video/mp4\r\n\r\n`;
-
-      const footer = `\r\n--${boundary}--\r\n`;
-      
-      const payload = Buffer.concat([
-        Buffer.from(header, "utf-8"),
-        fileBuffer,
-        Buffer.from(footer, "utf-8")
-      ]);
+      const formData = new FormData();
+      formData.append("reqtype", "fileupload");
+      formData.append("fileToUpload", new Blob([fileBuffer], { type: "video/mp4" }), "video.mp4");
 
       const catboxRes = await fetch("https://catbox.moe/user/api.php", {
         method: "POST",
-        headers: {
-          "Content-Type": `multipart/form-data; boundary=${boundary}`,
-          "User-Agent": "Mozilla/5.0"
-        },
-        body: payload
+        body: formData
       });
 
       if (catboxRes.ok) {
         const resultText = await catboxRes.text();
-        if (resultText && resultText.startsWith("http")) {
+        if (resultText && resultText.trim().startsWith("http")) {
           catboxUrl = resultText.trim();
         }
       }
     } catch (catErr) {
       console.error("Catbox upload error, fallback to local streaming:", catErr);
-      // Store in DB as fallback
-      try {
-        const fileBuffer = fs.readFileSync(finalPath);
-        await pgPool.query(
-          "INSERT INTO video (id, filename, mime_type, data, size) VALUES ($1, $2, $3, $4, $5)",
-          [uploadId, "video.mp4", 'video/mp4', fileBuffer, uploadInfo.totalSize]
-        );
-        catboxUrl = `/api/video/${uploadId}`;
-      } catch (dbErr) {
-        console.error("DB fallback error:", dbErr);
+    }
+
+    // Always store locally as reliable fallback/cache for fast playback
+    try {
+      const fileBuffer = fs.readFileSync(finalPath);
+      const mediaDir = path.join(process.cwd(), "data", "media");
+      if (!fs.existsSync(mediaDir)) {
+        fs.mkdirSync(mediaDir, { recursive: true });
       }
+      fs.writeFileSync(path.join(mediaDir, `${uploadId}.mp4`), fileBuffer);
+      
+      // Sync DB
+      await dbQuery(
+        `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE size = size`,
+        [uploadId, "video.mp4", 'video/mp4', fileBuffer.toString("base64"), uploadInfo.totalSize]
+      ).catch(() => {});
+    } catch (dbErr) {
+      console.error("DB/Disk storage error:", dbErr);
     } finally {
       if (fs.existsSync(finalPath)) {
         try { fs.unlinkSync(finalPath); } catch (e) {}
