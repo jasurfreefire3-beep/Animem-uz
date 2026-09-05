@@ -12,8 +12,8 @@ import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
-const ffmpeg = require("fluent-ffmpeg");
-const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import { GoogleGenAI } from "@google/genai";
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
@@ -97,7 +97,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+const PORT = 3000;
 
 // --- TURNSTILE VERIFICATION ---
 const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET || "6LdADY8tAAAAADio9AzwRTgqDCKluKa3pspF6aE3";
