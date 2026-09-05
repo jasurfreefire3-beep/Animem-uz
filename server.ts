@@ -3520,46 +3520,65 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
       writeStream.on("finish", () => resolve());
     });
     
-    // Upload combined mp4 to Catbox.moe for instant high-speed streaming
-    let catboxUrl = "";
-    try {
-      const fileBuffer = fs.readFileSync(finalPath);
-      
-      const formData = new FormData();
-      formData.append("reqtype", "fileupload");
-      formData.append("fileToUpload", new Blob([fileBuffer], { type: "video/mp4" }), "video.mp4");
-
-      const catboxRes = await fetch("https://catbox.moe/user/api.php", {
-        method: "POST",
-        body: formData
-      });
-
-      if (catboxRes.ok) {
-        const resultText = await catboxRes.text();
-        if (resultText && resultText.trim().startsWith("http")) {
-          catboxUrl = resultText.trim();
-        } else {
-          throw new Error("Catbox noto'g'ri javob qaytardi");
-        }
-      } else {
-        throw new Error(`Catbox HTTP xatoligi: ${catboxRes.status}`);
-      }
-    } catch (catErr) {
-      console.error("Catbox upload error:", catErr);
-      return res.status(500).json({ error: "Videoni serverga yuklashda xatolik yuz berdi (Catbox tarmog'i band yoki xatolik)" });
-    } finally {
-      if (fs.existsSync(finalPath)) {
-        try { fs.unlinkSync(finalPath); } catch (e) {}
-      }
+    // Create a local streaming URL to respond immediately (prevents 504 Timeout)
+    const localUrl = `/api/reels/stream/${uploadId}/video.mp4`;
+    
+    // Store locally temporarily for streaming while background task uploads to Catbox
+    const mediaDir = path.join(process.cwd(), "data", "media");
+    if (!fs.existsSync(mediaDir)) {
+      fs.mkdirSync(mediaDir, { recursive: true });
     }
+    const finalMediaLocation = path.join(mediaDir, `${uploadId}.mp4`);
+    fs.copyFileSync(finalPath, finalMediaLocation);
+    
+    // Immediately respond to frontend to avoid HTTP 504 Timeout!
+    res.status(201).json({ url: localUrl, success: true });
     
     activeReelUploads.delete(uploadId);
     
-    res.status(201).json({ url: catboxUrl, success: true });
-    
+    // Execute Catbox upload in the BACKGROUND without blocking the request!
+    setTimeout(async () => {
+      try {
+        const fileBuffer = fs.readFileSync(finalMediaLocation);
+        const formData = new FormData();
+        formData.append("reqtype", "fileupload");
+        formData.append("fileToUpload", new Blob([fileBuffer], { type: "video/mp4" }), "video.mp4");
+
+        const catboxRes = await fetch("https://catbox.moe/user/api.php", {
+          method: "POST",
+          body: formData
+        });
+
+        if (catboxRes.ok) {
+          const resultText = await catboxRes.text();
+          if (resultText && resultText.trim().startsWith("http")) {
+            const catboxUrl = resultText.trim();
+            
+            // Replace the temporary local URL with the Catbox URL in the Database!
+            await dbQuery(
+              "UPDATE reels SET video_url = ? WHERE video_url = ?",
+              [catboxUrl, localUrl]
+            );
+            
+            // Clean up the local file since it's on Catbox now
+            try { fs.unlinkSync(finalMediaLocation); } catch (e) {}
+            console.log(`[Catbox] Uploaded ${uploadId} successfully in background: ${catboxUrl}`);
+          }
+        }
+      } catch (bgErr) {
+        console.error(`[Catbox] Background upload error for ${uploadId}:`, bgErr);
+      } finally {
+        if (fs.existsSync(finalPath)) {
+          try { fs.unlinkSync(finalPath); } catch (e) {}
+        }
+      }
+    }, 1000); // 1-second delay to let the initial API request close cleanly
+
   } catch (err: any) {
     console.error("Upload finish error:", err);
-    res.status(500).json({ error: "Videoni saqlashda xatolik: " + err.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Videoni saqlashda xatolik: " + err.message });
+    }
   }
 });
 
