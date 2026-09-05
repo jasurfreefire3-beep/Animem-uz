@@ -1,3 +1,4 @@
+import os from "os";
 import express from "express";
 import cors from "cors";
 import crypto from "crypto";
@@ -13,11 +14,8 @@ import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
-import ffmpeg from "fluent-ffmpeg";
-import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import { GoogleGenAI } from "@google/genai";
 
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 import compression from "compression";
 import webpush from "web-push";
 
@@ -3413,6 +3411,7 @@ const activeReelUploads = new Map<string, {
 }>();
 
 app.post("/api/reels/upload-start", authenticateToken, (req: any, res: any) => {
+  try {
   const { filename, totalSize, mimeType } = req.body;
   const isAdmin = req.user?.role === "admin";
   const maxUserSize = 15 * 1024 * 1024; // 15 MB
@@ -3425,7 +3424,7 @@ app.post("/api/reels/upload-start", authenticateToken, (req: any, res: any) => {
   }
 
   const uploadId = "upl_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
-  const mediaDir = path.join(process.cwd(), "data", "media");
+  const mediaDir = path.join(os.tmpdir(), "media");
   if (!fs.existsSync(mediaDir)) {
     fs.mkdirSync(mediaDir, { recursive: true });
   }
@@ -3442,9 +3441,13 @@ app.post("/api/reels/upload-start", authenticateToken, (req: any, res: any) => {
   });
 
   res.json({ uploadId });
+  } catch (err: any) {
+    res.status(500).json({ error: "Start upload error: " + err.message });
+  }
 });
 
 app.post("/api/reels/upload-chunk", authenticateToken, upload.single("chunk"), (req: any, res: any) => {
+  try {
   const { uploadId, chunkIndex, totalChunks } = req.body;
   const uploadInfo = activeReelUploads.get(uploadId);
   
@@ -3464,11 +3467,20 @@ app.post("/api/reels/upload-chunk", authenticateToken, upload.single("chunk"), (
   
   // To avoid complexity, we can write chunk to disk: `tempPath_chunkIndex`
   const chunkPath = `${uploadInfo.tempPath}_${chunkIndex}`;
-  fs.renameSync(req.file.path, chunkPath);
+  try {
+    fs.copyFileSync(req.file.path, chunkPath);
+    fs.unlinkSync(req.file.path);
+  } catch (e: any) {
+    // fallback if copy fails
+    fs.renameSync(req.file.path, chunkPath);
+  }
   
   uploadInfo.receivedChunks.add(Number(chunkIndex));
   
   res.json({ success: true, progress: Math.round((uploadInfo.receivedChunks.size / uploadInfo.expectedChunks) * 100) });
+  } catch (err: any) {
+    res.status(500).json({ error: "Chunk upload error: " + err.message });
+  }
 });
 
 app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: any) => {
@@ -3497,7 +3509,9 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
     }
     writeStream.end();
     
-    await new Promise((resolve) => writeStream.on("finish", resolve));
+    await new Promise<void>((resolve) => {
+      writeStream.on("finish", () => resolve());
+    });
     
     
     // "mp4 bolib yuklansin ffpmeg orqali hls namoish etilsin" (upload as mp4, show as hls via ffmpeg).
@@ -3513,6 +3527,10 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
       );
     } catch(dbErr) {
       console.error("PostgreSQL DB insert error:", dbErr);
+    } finally {
+      if (fs.existsSync(finalPath)) {
+        try { fs.unlinkSync(finalPath); } catch (e) {}
+      }
     }
     
     activeReelUploads.delete(uploadId);
@@ -3528,7 +3546,7 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
 
 app.get("/api/media/hls/:id/:file", (req: any, res: any) => {
   const { id, file } = req.params;
-  const mediaDir = path.join(process.cwd(), "data", "media");
+  const mediaDir = path.join(os.tmpdir(), "media");
   const filePath = path.join(mediaDir, `${id}.temp_hls`, file);
   
   if (fs.existsSync(filePath)) {
@@ -3586,7 +3604,7 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
     const mediaId = "reel_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
 
     // Save to persistent server media storage
-    const mediaDir = path.join(process.cwd(), "data", "media");
+    const mediaDir = path.join(os.tmpdir(), "media");
     if (!fs.existsSync(mediaDir)) {
       fs.mkdirSync(mediaDir, { recursive: true });
     }
