@@ -3376,57 +3376,34 @@ app.post("/api/reels/upload-direct", authenticateToken, upload.single("video"), 
     }
 
     const uploadId = "upl_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
-    const mediaDir = path.join(process.cwd(), "data", "media");
-    if (!fs.existsSync(mediaDir)) {
-      fs.mkdirSync(mediaDir, { recursive: true });
-    }
+    let catboxUrl = "";
 
-    const finalPath = path.join(mediaDir, `${uploadId}.mp4`);
-    fs.copyFileSync(req.file.path, finalPath);
-
-    let fileBuffer: Buffer | null = null;
     try {
-      fileBuffer = fs.readFileSync(finalPath);
-    } catch (e) {}
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const formData = new FormData();
+      formData.append("reqtype", "fileupload");
+      formData.append("fileToUpload", new Blob([fileBuffer], { type: req.file.mimetype || "video/mp4" }), "video.mp4");
 
-    let catboxUrl = `/api/reels/stream/${uploadId}/video.mp4`;
+      // Upload to Catbox without arbitrary timeout to allow 30MB videos to finish
+      const catboxRes = await fetch("https://catbox.moe/user/api.php", {
+        method: "POST",
+        body: formData
+      });
 
-    // Try fast Catbox upload (with 5s timeout)
-    if (fileBuffer) {
-      try {
-        const formData = new FormData();
-        formData.append("reqtype", "fileupload");
-        formData.append("fileToUpload", new Blob([fileBuffer], { type: req.file.mimetype || "video/mp4" }), "video.mp4");
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        const catboxRes = await fetch("https://catbox.moe/user/api.php", {
-          method: "POST",
-          body: formData,
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (catboxRes.ok) {
-          const resultText = await catboxRes.text();
-          if (resultText && resultText.trim().startsWith("http")) {
-            catboxUrl = resultText.trim();
-          }
+      if (catboxRes.ok) {
+        const resultText = await catboxRes.text();
+        if (resultText && resultText.trim().startsWith("http")) {
+          catboxUrl = resultText.trim();
+        } else {
+          throw new Error("Catbox noto'g'ri javob qaytardi");
         }
-      } catch (catErr) {
-        console.warn("Direct upload catbox fallback:", catErr);
+      } else {
+        throw new Error(`Catbox HTTP xatoligi: ${catboxRes.status}`);
       }
-
-      // Sync to media_files in DB
-      try {
-        await dbQuery(
-          `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE size = size`,
-          [uploadId, "video.mp4", req.file.mimetype || 'video/mp4', fileBuffer.toString("base64"), req.file.size]
-        );
-      } catch (dbErr) {
-        console.warn("Direct upload DB sync notice:", dbErr);
-      }
+    } catch (catErr) {
+      console.error("Direct upload catbox error:", catErr);
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      return res.status(500).json({ error: "Videoni serverga yuklashda xatolik yuz berdi (Catbox tarmog'i band yoki xatolik)" });
     }
 
     // Clean up tmp file
@@ -3527,7 +3504,6 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
   }
   
   const finalPath = uploadInfo.tempPath + ".mp4";
-  const hlsDir = uploadInfo.tempPath + "_hls";
   
   try {
     // Combine chunks
@@ -3544,11 +3520,8 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
       writeStream.on("finish", () => resolve());
     });
     
-    
-    // "mp4 bolib yuklansin ffpmeg orqali hls namoish etilsin" (upload as mp4, show as hls via ffmpeg).
-
     // Upload combined mp4 to Catbox.moe for instant high-speed streaming
-    let catboxUrl = `/api/reels/stream/${uploadId}/video.mp4`;
+    let catboxUrl = "";
     try {
       const fileBuffer = fs.readFileSync(finalPath);
       
@@ -3565,28 +3538,15 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
         const resultText = await catboxRes.text();
         if (resultText && resultText.trim().startsWith("http")) {
           catboxUrl = resultText.trim();
+        } else {
+          throw new Error("Catbox noto'g'ri javob qaytardi");
         }
+      } else {
+        throw new Error(`Catbox HTTP xatoligi: ${catboxRes.status}`);
       }
     } catch (catErr) {
-      console.error("Catbox upload error, fallback to local streaming:", catErr);
-    }
-
-    // Always store locally as reliable fallback/cache for fast playback
-    try {
-      const fileBuffer = fs.readFileSync(finalPath);
-      const mediaDir = path.join(process.cwd(), "data", "media");
-      if (!fs.existsSync(mediaDir)) {
-        fs.mkdirSync(mediaDir, { recursive: true });
-      }
-      fs.writeFileSync(path.join(mediaDir, `${uploadId}.mp4`), fileBuffer);
-      
-      // Sync DB
-      await dbQuery(
-        `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE size = size`,
-        [uploadId, "video.mp4", 'video/mp4', fileBuffer.toString("base64"), uploadInfo.totalSize]
-      ).catch(() => {});
-    } catch (dbErr) {
-      console.error("DB/Disk storage error:", dbErr);
+      console.error("Catbox upload error:", catErr);
+      return res.status(500).json({ error: "Videoni serverga yuklashda xatolik yuz berdi (Catbox tarmog'i band yoki xatolik)" });
     } finally {
       if (fs.existsSync(finalPath)) {
         try { fs.unlinkSync(finalPath); } catch (e) {}
@@ -3598,8 +3558,8 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
     res.status(201).json({ url: catboxUrl, success: true });
     
   } catch (err: any) {
-    console.error("HLS conversion error:", err);
-    res.status(500).json({ error: "Videoni qayta ishlashda xatolik: " + err.message });
+    console.error("Upload finish error:", err);
+    res.status(500).json({ error: "Videoni saqlashda xatolik: " + err.message });
   }
 });
 
