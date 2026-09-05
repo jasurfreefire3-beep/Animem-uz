@@ -3615,6 +3615,16 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
       console.warn("Disk media save warning:", diskErr);
     }
 
+    // Store raw video directly in PostgreSQL database for streaming via /api/video/:id
+    try {
+      await pgPool.query(
+        "INSERT INTO video (id, filename, mime_type, data, size) VALUES ($1, $2, $3, $4, $5)",
+        [mediaId, filename, mimeType, fileBuffer, fileSize]
+      );
+    } catch (pgErr) {
+      console.error("PostgreSQL video insert error:", pgErr);
+    }
+
     // Sync to database if available
     try {
       const base64String = fileBuffer.toString("base64");
