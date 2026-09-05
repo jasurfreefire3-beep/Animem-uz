@@ -643,8 +643,8 @@ export default function Register() {
               </div>
             </button>
 
-            {/* Option: Facebook */}
-            <button
+            {/* Option: Facebook (Vaqtincha yashirilgan) */}
+            {/* <button
               onClick={handleFacebookLogin}
               className="w-full bg-[#1877F2] hover:bg-[#145fc4] text-white p-4 rounded-sm transition-all text-left flex items-center gap-4 cursor-pointer"
             >
@@ -661,9 +661,10 @@ export default function Register() {
                   Facebook akkaunt orqali bir bosishda
                 </div>
               </div>
-            </button>
+            </button> */}
 
-            <button
+            {/* Option: Discord (Vaqtincha yashirilgan) */}
+            {/* <button
               onClick={handleDiscordLoginStart}
               className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white p-4 rounded-sm transition-all text-left flex items-center gap-4 cursor-pointer"
             >
@@ -676,7 +677,7 @@ export default function Register() {
                 <div className="text-sm font-black text-white">Discord bilan kirish</div>
                 <div className="text-[11px] text-white/70">Discord akkauntingiz orqali bir bosishda</div>
               </div>
-            </button>
+            </button> */}
 
             {/* Option 3: Telegram (Tavsiya) */}
             <button

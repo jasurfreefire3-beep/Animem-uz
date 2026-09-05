@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageCircle } from 'lucide-react';
+import { X, Send, MessageCircle, Sparkles } from 'lucide-react';
 import { ReelComment } from '../types';
+import FormattedContent from './FormattedContent';
+import GifPicker from './GifPicker';
 
 interface ReelsCommentsModalProps {
   isOpen: boolean;
@@ -8,6 +10,7 @@ interface ReelsCommentsModalProps {
   reelId: number | string;
   commentsCount: number;
   onCommentAdded: () => void;
+  onCommentsCountSync?: (count: number) => void;
   currentUser?: any;
 }
 
@@ -17,11 +20,13 @@ export default function ReelsCommentsModal({
   reelId,
   commentsCount,
   onCommentAdded,
+  onCommentsCountSync,
   currentUser,
 }: ReelsCommentsModalProps) {
   const [comments, setComments] = useState<ReelComment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [newComment, setNewComment] = useState<string>('');
+  const [showGifPicker, setShowGifPicker] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const commentsListRef = useRef<HTMLDivElement>(null);
@@ -37,8 +42,12 @@ export default function ReelsCommentsModal({
       .then((res) => res.json())
       .then((data) => {
         if (isCurrent) {
-          setComments(Array.isArray(data) ? data : []);
+          const list = Array.isArray(data) ? data : [];
+          setComments(list);
           setLoading(false);
+          if (onCommentsCountSync) {
+            onCommentsCountSync(list.length);
+          }
         }
       })
       .catch((err) => {
@@ -52,7 +61,7 @@ export default function ReelsCommentsModal({
     return () => {
       isCurrent = false;
     };
-  }, [isOpen, reelId]);
+  }, [isOpen, reelId, onCommentsCountSync]);
 
   useEffect(() => {
     if (isOpen) {
@@ -64,12 +73,13 @@ export default function ReelsCommentsModal({
 
   if (!isOpen) return null;
 
-  const handleSubmitComment = async (e?: React.FormEvent) => {
+  const handleSubmitComment = async (customContent?: string, e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!newComment.trim() || isSubmitting) return;
+    const contentToSend = (typeof customContent === 'string' ? customContent : newComment).trim();
+    if (!contentToSend || isSubmitting) return;
 
-    const content = newComment.trim();
     setIsSubmitting(true);
+    setShowGifPicker(false);
 
     const token = localStorage.getItem('token');
     const guestName = localStorage.getItem('animem_guest_name') || 'Muxlis_' + Math.floor(100 + Math.random() * 900);
@@ -80,12 +90,14 @@ export default function ReelsCommentsModal({
       reel_id: reelId,
       username: currentUser?.name || guestName,
       user_avatar: currentUser?.avatar_url || guestAvatar,
-      content,
+      content: contentToSend,
       created_at: new Date().toISOString(),
     };
 
     setComments((prev) => [optimisticComment, ...prev]);
-    setNewComment('');
+    if (!customContent) {
+      setNewComment('');
+    }
     onCommentAdded();
 
     try {
@@ -96,7 +108,7 @@ export default function ReelsCommentsModal({
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          content,
+          content: contentToSend,
           username: currentUser?.name || guestName,
           user_avatar: currentUser?.avatar_url || guestAvatar,
         }),
@@ -104,12 +116,20 @@ export default function ReelsCommentsModal({
       const data = await res.json();
       if (data?.comment) {
         setComments((prev) => prev.map((c) => (c.id === optimisticComment.id ? data.comment : c)));
+        if (data.comments_count !== undefined && onCommentsCountSync) {
+          onCommentsCountSync(data.comments_count);
+        }
       }
     } catch (err) {
       console.error('Post comment error:', err);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSelectGif = (gifUrl: string) => {
+    setShowGifPicker(false);
+    handleSubmitComment(`[gif]${gifUrl}[/gif]`);
   };
 
   const addEmoji = (emoji: string) => {
@@ -137,7 +157,7 @@ export default function ReelsCommentsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
       <div 
-        className="w-full sm:max-w-md h-[70vh] sm:h-[600px] bg-[#121217] border border-white/10 rounded-t-2xl sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden animate-slide-up"
+        className="w-full sm:max-w-md h-[75vh] sm:h-[620px] bg-[#121217] border border-white/10 rounded-t-2xl sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden animate-slide-up relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -145,33 +165,36 @@ export default function ReelsCommentsModal({
           <div className="flex items-center space-x-2">
             <MessageCircle className="w-5 h-5 text-pink-500" />
             <h3 className="font-semibold text-white text-base">
-              Izohlar ({comments.length || commentsCount})
+              Izohlar ({Math.max(comments.length, commentsCount)})
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+            className="p-1 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Comment list */}
-        <div ref={commentsListRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Comments List */}
+        <div 
+          ref={commentsListRef}
+          className="flex-1 overflow-y-auto p-4 space-y-4 divide-y divide-white/5 scrollbar-thin scrollbar-thumb-white/10"
+        >
           {loading ? (
             <div className="flex flex-col items-center justify-center h-48 space-y-3">
               <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-white/50">Izohlar yuklanmoqda...</p>
+              <span className="text-xs text-white/50">Izohlar yuklanmoqda...</span>
             </div>
           ) : comments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 space-y-2 text-center text-white/50">
-              <MessageCircle className="w-12 h-12 text-white/20 stroke-1" />
-              <p className="text-sm">Hali hech kim izoh qoldirmagan</p>
+            <div className="flex flex-col items-center justify-center h-48 text-center space-y-2">
+              <MessageCircle className="w-10 h-10 text-white/20" />
+              <p className="text-sm font-medium text-white/60">Hozircha izohlar yo'q</p>
               <p className="text-xs text-white/40">Birinchi bo'lib fikringizni yozing!</p>
             </div>
           ) : (
             comments.map((comment) => (
-              <div key={comment.id} className="flex items-start space-x-3 group">
+              <div key={comment.id} className="flex items-start space-x-3 group pt-3 first:pt-0">
                 <img
                   src={comment.user_avatar || 'https://files.catbox.moe/45hoi6.png'}
                   alt={comment.username}
@@ -189,14 +212,24 @@ export default function ReelsCommentsModal({
                       {formatRelativeTime(comment.created_at)}
                     </span>
                   </div>
-                  <p className="text-sm text-white/80 break-words mt-0.5 whitespace-pre-wrap leading-relaxed">
-                    {comment.content}
-                  </p>
+                  <div className="text-sm text-white/80 break-words mt-0.5 leading-relaxed">
+                    <FormattedContent content={comment.content} />
+                  </div>
                 </div>
               </div>
             ))
           )}
         </div>
+
+        {/* Gif Picker popover */}
+        {showGifPicker && (
+          <div className="absolute bottom-24 left-3 right-3 sm:left-auto sm:right-3 z-50">
+            <GifPicker
+              onSelectGif={handleSelectGif}
+              onClose={() => setShowGifPicker(false)}
+            />
+          </div>
+        )}
 
         {/* Quick Emojis */}
         <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between text-lg bg-[#14141a]">
@@ -213,7 +246,19 @@ export default function ReelsCommentsModal({
         </div>
 
         {/* Comment input form */}
-        <form onSubmit={handleSubmitComment} className="p-3 border-t border-white/10 bg-[#16161d] flex items-center space-x-2">
+        <form onSubmit={(e) => handleSubmitComment(undefined, e)} className="p-3 border-t border-white/10 bg-[#16161d] flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={() => setShowGifPicker(prev => !prev)}
+            className={`p-2 rounded-full border transition-all ${
+              showGifPicker 
+                ? 'bg-[#ff006a]/20 border-[#ff006a] text-[#ff006a]' 
+                : 'bg-white/5 border-white/10 text-white/60 hover:text-[#ff006a] hover:border-[#ff006a]/40'
+            }`}
+            title="GIF tanlash"
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
           <input
             ref={inputRef}
             type="text"

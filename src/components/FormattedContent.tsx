@@ -6,13 +6,15 @@ interface FormattedContentProps {
   imageClassName?: string;
 }
 
-// Regex to identify [gif]URL[/gif] or bare https://api.animem.uz/i/... URLs
-const GIF_TAG_REGEX = /\[gif\](https?:\/\/[^\s\]]+)\[\/gif\]/gi;
-const ANIMEM_IMAGE_REGEX = /(https?:\/\/api\.animem\.uz\/i\/[a-zA-Z0-9-]+)/gi;
+// Regex to identify [gif]...[/gif] tags (matches any url or relative path inside)
+const GIF_TAG_REGEX = /\[gif\]([\s\S]*?)\[\/gif\]/gi;
+const ANIMEM_IMAGE_REGEX = /(https?:\/\/api\.animem\.uz\/i\/[a-zA-Z0-9_-]+)/gi;
 
 export function isGifContent(content: string): boolean {
   if (!content) return false;
-  return GIF_TAG_REGEX.test(content) || ANIMEM_IMAGE_REGEX.test(content);
+  return /\[gif\][\s\S]*?\[\/gif\]/i.test(content) || 
+         ANIMEM_IMAGE_REGEX.test(content) ||
+         /^\/api\/media\/gif_[a-zA-Z0-9_-]+/i.test(content.trim());
 }
 
 export function extractGifs(content: string): string[] {
@@ -20,12 +22,15 @@ export function extractGifs(content: string): string[] {
   const matches: string[] = [];
   
   let match;
-  const tagRegex = /\[gif\](https?:\/\/[^\s\]]+)\[\/gif\]/gi;
+  const tagRegex = /\[gif\]([\s\S]*?)\[\/gif\]/gi;
   while ((match = tagRegex.exec(content)) !== null) {
-    matches.push(match[1]);
+    const url = match[1]?.trim();
+    if (url && !matches.includes(url)) {
+      matches.push(url);
+    }
   }
   
-  const bareRegex = /(https?:\/\/api\.animem\.uz\/i\/[a-zA-Z0-9-]+)/gi;
+  const bareRegex = /(https?:\/\/api\.animem\.uz\/i\/[a-zA-Z0-9_-]+)/gi;
   while ((match = bareRegex.exec(content)) !== null) {
     if (!matches.includes(match[1])) {
       matches.push(match[1]);
@@ -35,6 +40,59 @@ export function extractGifs(content: string): string[] {
   return matches;
 }
 
+interface Segment {
+  type: 'text' | 'gif';
+  value: string;
+}
+
+export function parseContentSegments(rawContent: string): Segment[] {
+  if (!rawContent) return [];
+
+  const segments: Segment[] = [];
+  const gifTagRegex = /\[gif\]([\s\S]*?)\[\/gif\]/gi;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = gifTagRegex.exec(rawContent)) !== null) {
+    const textBefore = rawContent.slice(lastIndex, match.index);
+    if (textBefore) {
+      segments.push({ type: 'text', value: textBefore });
+    }
+    const gifUrl = match[1]?.trim();
+    if (gifUrl) {
+      segments.push({ type: 'gif', value: gifUrl });
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  const remaining = rawContent.slice(lastIndex);
+  if (remaining) {
+    segments.push({ type: 'text', value: remaining });
+  }
+
+  // Now scan text segments for bare media links
+  const finalSegments: Segment[] = [];
+  const bareRegex = /(https?:\/\/api\.animem\.uz\/i\/[a-zA-Z0-9_-]+|\/api\/media\/gif_[a-zA-Z0-9_-]+|https?:\/\/[^\s]+\.(?:gif|webp|png|jpg|jpeg)(?:\?[^\s]*)?)/gi;
+
+  for (const seg of segments) {
+    if (seg.type === 'gif') {
+      finalSegments.push(seg);
+    } else {
+      const parts = seg.value.split(bareRegex);
+      for (const part of parts) {
+        if (!part) continue;
+        if (bareRegex.test(part)) {
+          finalSegments.push({ type: 'gif', value: part.trim() });
+        } else {
+          finalSegments.push({ type: 'text', value: part });
+        }
+      }
+    }
+  }
+
+  return finalSegments;
+}
+
 export default function FormattedContent({
   content,
   className = '',
@@ -42,74 +100,34 @@ export default function FormattedContent({
 }: FormattedContentProps) {
   if (!content) return null;
 
-  // Split by [gif]...[/gif] and also recognize bare api.animem.uz/i/ links
-  // Let's normalize [gif]...[/gif] tags first
-  const normalized = content.replace(
-    /\[gif\](https?:\/\/[^\s\]]+)\[\/gif\]/gi,
-    ' ___GIF_SEPARATOR___$1___GIF_SEPARATOR___ '
-  );
-
-  // Also check if entire content is just a direct api.animem.uz/i/ link
-  const parts = normalized.split('___GIF_SEPARATOR___');
+  const segments = parseContentSegments(content);
 
   return (
-    <div className={`space-y-1 ${className}`}>
-      {parts.map((part, index) => {
-        const trimmed = part.trim();
-        if (!trimmed) return null;
-
-        // Check if this part is a GIF / Image URL
-        const isUrl = /^https?:\/\/.*\.(gif|webp|png|jpg|jpeg)$/i.test(trimmed) ||
-          trimmed.startsWith('https://api.animem.uz/i/') ||
-          trimmed.includes('api.animem.uz/i/');
-
-        if (isUrl) {
+    <div className={`space-y-1.5 ${className}`}>
+      {segments.map((seg, index) => {
+        if (seg.type === 'gif') {
           return (
-            <div key={index} className="my-1 block">
+            <div key={index} className="my-1.5 inline-block max-w-full">
               <img
-                src={trimmed}
+                src={seg.value}
                 alt="Anime GIF"
-                className={`rounded-xl max-h-36 sm:max-h-44 max-w-[180px] sm:max-w-[220px] object-contain border border-[#ff006a]/30 shadow-lg shadow-black/40 bg-black/40 hover:scale-105 transition-transform duration-200 cursor-pointer block ${imageClassName}`}
+                className={`rounded-xl max-h-40 sm:max-h-52 max-w-[200px] sm:max-w-[260px] object-contain border border-[#ff006a]/30 shadow-lg shadow-black/40 bg-black/40 hover:scale-[1.02] transition-transform duration-200 cursor-pointer block ${imageClassName}`}
                 loading="lazy"
                 decoding="async"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
+                  // If image fails, show small fallback link or text
+                  const target = e.target as HTMLElement;
+                  target.style.display = 'none';
                 }}
               />
             </div>
           );
         }
 
-        // Check if there are bare api.animem.uz/i/ links inside text
-        if (ANIMEM_IMAGE_REGEX.test(trimmed)) {
-          const subParts = trimmed.split(/(https?:\/\/api\.animem\.uz\/i\/[a-zA-Z0-9-]+)/gi);
-          return (
-            <div key={index} className="leading-relaxed">
-              {subParts.map((sub, sIdx) => {
-                if (sub.startsWith('https://api.animem.uz/i/')) {
-                  return (
-                    <div key={sIdx} className="my-1 block">
-                      <img
-                        src={sub}
-                        alt="Anime GIF"
-                        className={`rounded-xl max-h-36 sm:max-h-44 max-w-[180px] sm:max-w-[220px] object-contain border border-[#ff006a]/30 shadow-lg shadow-black/40 bg-black/40 hover:scale-105 transition-transform duration-200 cursor-pointer block ${imageClassName}`}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                  );
-                }
-                return <span key={sIdx}>{sub}</span>;
-              })}
-            </div>
-          );
-        }
-
         return (
-          <span key={index} className="leading-relaxed">
-            {part}
+          <span key={index} className="leading-relaxed whitespace-pre-wrap break-words">
+            {seg.value}
           </span>
         );
       })}

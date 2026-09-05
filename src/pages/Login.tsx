@@ -657,7 +657,8 @@ export default function Login() {
                 Google bilan kirish
               </button>
 
-              <button
+              {/* Vaqtincha yashirilgan: Facebook bilan kirish */}
+              {/* <button
                 type="button"
                 onClick={handleFacebookLogin}
                 className="w-full bg-[#1877F2] hover:bg-[#145fc4] text-white font-bold py-3 px-4 rounded-sm transition-colors mt-3 flex items-center justify-center gap-3 cursor-pointer"
@@ -666,9 +667,10 @@ export default function Login() {
                   <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047v-2.66c0-3.026 1.792-4.697 4.533-4.697 1.313 0 2.686.235 2.686.235v2.971H15.83c-1.491 0-1.956.93-1.956 1.886v2.265h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z" />
                 </svg>
                 Facebook bilan kirish
-              </button>
+              </button> */}
 
-              <button
+              {/* Vaqtincha yashirilgan: Discord bilan kirish */}
+              {/* <button
                 type="button"
                 onClick={handleDiscordLoginStart}
                 className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-3 px-4 rounded-sm transition-colors mt-3 flex items-center justify-center gap-3 cursor-pointer"
@@ -677,7 +679,7 @@ export default function Login() {
                   <path d="M20.32 4.37A19.8 19.8 0 0015.55 3l-.6 1.22a18.27 18.27 0 00-5.9 0L8.45 3a19.7 19.7 0 00-4.77 1.37C.66 8.9-.16 13.3.25 17.63A19.9 19.9 0 006.1 20.6l1.42-1.95a12.2 12.2 0 01-2.24-1.08l.54-.42c4.32 2 9 2 13.27 0l.54.42c-.72.43-1.47.79-2.24 1.08l1.42 1.95a19.8 19.8 0 005.85-2.97c.48-5.02-.82-9.38-3.34-13.26zM8.4 15.02c-1.15 0-2.1-1.05-2.1-2.34s.92-2.34 2.1-2.34c1.19 0 2.12 1.06 2.1 2.34.01 1.29-.91 2.34-2.1 2.34zm7.2 0c-1.15 0-2.1-1.05-2.1-2.34s.92-2.34 2.1-2.34c1.19 0 2.12 1.06 2.1 2.34.01 1.29-.91 2.34-2.1 2.34z" />
                 </svg>
                 Discord bilan kirish
-              </button>
+              </button> */}
 
               <button
                 type="button"

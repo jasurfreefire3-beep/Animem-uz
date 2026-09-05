@@ -1139,12 +1139,12 @@ export default function Profil() {
             </Link>
 
             {isOwner && (
-              <button
-                onClick={() => setShowAddReelModal(true)}
+              <Link
+                to="/upload"
                 className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <Upload size={13} /> Video yuklash
-              </button>
+              </Link>
             )}
           </div>
         </div>
@@ -1163,12 +1163,12 @@ export default function Profil() {
                 : "Ushbu foydalanuvchi hali birorta ham reel yuklamagan."}
             </p>
             {isOwner && (
-              <button
-                onClick={() => setShowAddReelModal(true)}
+              <Link
+                to="/upload"
                 className="inline-block bg-pink-600/20 hover:bg-pink-600 text-pink-300 hover:text-white border border-pink-500/30 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer"
               >
                 + Ilk Reel videoni yuklash (15 MB gacha)
-              </button>
+              </Link>
             )}
           </div>
         ) : (

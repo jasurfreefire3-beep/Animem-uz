@@ -1,5 +1,6 @@
 import { uploadVideoInChunks } from "../utils/upload";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Heart, 
   MessageCircle, 
@@ -31,6 +32,7 @@ interface ReelsProps {
 export default function Reels({ currentUser: propUser }: ReelsProps) {
   const { user: authUser } = useAuth();
   const currentUser = propUser || authUser;
+  const navigate = useNavigate();
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeIndex, setActiveIndex] = useState<number>(0);
@@ -401,11 +403,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
         {/* Add Reel button */}
         <button
           onClick={() => {
-            if (!currentUser) {
-              alert("Reel qo'shish uchun avval profilingizga kiring!");
-              return;
-            }
-            setShowAddModal(true);
+            navigate('/upload');
           }}
           className="flex items-center space-x-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-bold px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full shadow-xl transition-all active:scale-95 border border-pink-400/30 cursor-pointer backdrop-blur-md"
           title="Video qo'shish"
@@ -451,11 +449,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
             <p className="text-sm text-white/60 max-w-sm">Birinchi bo'lib qiziqarli Reel video yuklang!</p>
             <button
               onClick={() => {
-                if (!currentUser) {
-                  alert("Reel qo'shish uchun avval profilingizga kiring!");
-                  return;
-                }
-                setShowAddModal(true);
+                navigate('/upload');
               }}
               className="flex items-center space-x-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-sm font-bold px-5 py-2.5 rounded-full shadow-xl transition-all active:scale-95 cursor-pointer"
             >
@@ -656,6 +650,21 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                   ? { ...r, comments_count: (r.comments_count || 0) + 1 }
                   : r
               )
+            );
+            setActiveCommentsReel((prev) =>
+              prev ? { ...prev, comments_count: (prev.comments_count || 0) + 1 } : null
+            );
+          }}
+          onCommentsCountSync={(count: number) => {
+            setReels((prev) =>
+              prev.map((r) =>
+                String(r.id) === String(activeCommentsReel.id)
+                  ? { ...r, comments_count: count }
+                  : r
+              )
+            );
+            setActiveCommentsReel((prev) =>
+              prev ? { ...prev, comments_count: count } : null
             );
           }}
         />

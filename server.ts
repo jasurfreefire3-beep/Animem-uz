@@ -2922,7 +2922,7 @@ app.get("/api/reels", async (req: any, res: any) => {
   try {
     let sql = `
       SELECT r.*,
-        COALESCE(NULLIF(u.username, ''), NULLIF(u.name, ''), NULLIF(r.author_name, ''), 'Animem.uz') as author_name,
+        COALESCE(NULLIF(u.name, ''), NULLIF(r.author_name, ''), 'Animem.uz') as author_name,
         COALESCE(NULLIF(u.avatar_url, ''), NULLIF(r.author_avatar, ''), 'https://files.catbox.moe/45hoi6.png') as author_avatar,
         (SELECT COUNT(*) FROM reel_comments WHERE reel_id = r.id) as comments_count,
         EXISTS(SELECT 1 FROM reel_likes WHERE reel_id = r.id AND user_identifier = ?) as is_liked
@@ -2980,7 +2980,7 @@ app.get("/api/reels/:id", async (req: any, res: any) => {
   try {
     const [rows]: any = await dbQuery(`
       SELECT r.*,
-        COALESCE(NULLIF(u.username, ''), NULLIF(u.name, ''), NULLIF(r.author_name, ''), 'Animem.uz') as author_name,
+        COALESCE(NULLIF(u.name, ''), NULLIF(r.author_name, ''), 'Animem.uz') as author_name,
         COALESCE(NULLIF(u.avatar_url, ''), NULLIF(r.author_avatar, ''), 'https://files.catbox.moe/45hoi6.png') as author_avatar,
         (SELECT COUNT(*) FROM reel_comments WHERE reel_id = r.id) as comments_count,
         EXISTS(SELECT 1 FROM reel_likes WHERE reel_id = r.id AND user_identifier = ?) as is_liked
@@ -3133,12 +3133,26 @@ app.post("/api/reels/:id/comments", async (req: any, res: any) => {
     const trimmedContent = content.trim();
     let insertedId = Date.now();
 
+    let currentTotalComments = 1;
     try {
       const [result]: any = await dbQuery(
         "INSERT INTO reel_comments (reel_id, user_id, username, user_avatar, content) VALUES (?, ?, ?, ?, ?)",
         [reelId, userId, finalUsername, finalAvatar, trimmedContent]
       );
       if (result?.insertId) insertedId = result.insertId;
+
+      await dbQuery(
+        "UPDATE reels SET comments_count = (SELECT COUNT(*) FROM reel_comments WHERE reel_id = ?) WHERE id = ?",
+        [reelId, reelId]
+      );
+
+      const [countRows]: any = await dbQuery(
+        "SELECT COUNT(*) as total FROM reel_comments WHERE reel_id = ?",
+        [reelId]
+      );
+      if (countRows?.[0]?.total !== undefined) {
+        currentTotalComments = Number(countRows[0].total);
+      }
     } catch (dbErr: any) {
       console.warn("DB insert reel comment warning:", dbErr?.message || dbErr);
     }
@@ -3156,11 +3170,18 @@ app.post("/api/reels/:id/comments", async (req: any, res: any) => {
     const store = loadLocalStore();
     if (!store.reel_comments) store.reel_comments = [];
     store.reel_comments.unshift(newComment);
+    if (store.reels) {
+      const rIdx = store.reels.findIndex((r: any) => String(r.id) === String(reelId));
+      if (rIdx !== -1) {
+        store.reels[rIdx].comments_count = (store.reels[rIdx].comments_count || 0) + 1;
+      }
+    }
     saveLocalStore(store);
 
     return res.status(201).json({
       success: true,
-      comment: newComment
+      comment: newComment,
+      comments_count: currentTotalComments
     });
   } catch (err: any) {
     console.error("Add reel comment error:", err);
@@ -3221,12 +3242,12 @@ app.post("/api/reels", authenticateToken, async (req: any, res: any) => {
     if (currentUserId) {
       try {
         const [uRows]: any = await dbQuery(
-          "SELECT id, name, username, avatar_url FROM users WHERE id = ?",
+          "SELECT id, name, avatar_url FROM users WHERE id = ?",
           [currentUserId]
         );
         if (uRows && uRows.length > 0) {
           const u = uRows[0];
-          authorName = u.username || u.name || authorName || "Foydalanuvchi";
+          authorName = u.name || authorName || "Foydalanuvchi";
           authorAvatar = u.avatar_url || authorAvatar || "https://files.catbox.moe/45hoi6.png";
         }
       } catch (e) {
@@ -3335,6 +3356,92 @@ const activeReelUploads = new Map<string, {
   receivedChunks: Set<number>;
   mimeType: string;
 }>();
+
+// High-speed direct reel video upload with real-time progress
+app.post("/api/reels/upload-direct", authenticateToken, upload.single("video"), async (req: any, res: any) => {
+  try {
+    const isAdmin = req.user?.role === "admin";
+    const maxUserSize = 15 * 1024 * 1024; // 15 MB
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Video fayli tanlanmadi" });
+    }
+
+    if (!isAdmin && req.file.size > maxUserSize) {
+      const currentMB = (req.file.size / (1024 * 1024)).toFixed(1);
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      return res.status(400).json({ 
+        error: `Maksimal video hajmi 15 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 15 MB dan kichik video yuklang!` 
+      });
+    }
+
+    const uploadId = "upl_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+    const mediaDir = path.join(process.cwd(), "data", "media");
+    if (!fs.existsSync(mediaDir)) {
+      fs.mkdirSync(mediaDir, { recursive: true });
+    }
+
+    const finalPath = path.join(mediaDir, `${uploadId}.mp4`);
+    fs.copyFileSync(req.file.path, finalPath);
+
+    let fileBuffer: Buffer | null = null;
+    try {
+      fileBuffer = fs.readFileSync(finalPath);
+    } catch (e) {}
+
+    let catboxUrl = `/api/reels/stream/${uploadId}/video.mp4`;
+
+    // Try fast Catbox upload (with 5s timeout)
+    if (fileBuffer) {
+      try {
+        const formData = new FormData();
+        formData.append("reqtype", "fileupload");
+        formData.append("fileToUpload", new Blob([fileBuffer], { type: req.file.mimetype || "video/mp4" }), "video.mp4");
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const catboxRes = await fetch("https://catbox.moe/user/api.php", {
+          method: "POST",
+          body: formData,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (catboxRes.ok) {
+          const resultText = await catboxRes.text();
+          if (resultText && resultText.trim().startsWith("http")) {
+            catboxUrl = resultText.trim();
+          }
+        }
+      } catch (catErr) {
+        console.warn("Direct upload catbox fallback:", catErr);
+      }
+
+      // Sync to media_files in DB
+      try {
+        await dbQuery(
+          `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE size = size`,
+          [uploadId, "video.mp4", req.file.mimetype || 'video/mp4', fileBuffer.toString("base64"), req.file.size]
+        );
+      } catch (dbErr) {
+        console.warn("Direct upload DB sync notice:", dbErr);
+      }
+    }
+
+    // Clean up tmp file
+    try { fs.unlinkSync(req.file.path); } catch (e) {}
+
+    return res.status(201).json({
+      success: true,
+      url: catboxUrl,
+      uploadId
+    });
+  } catch (err: any) {
+    console.error("Direct upload error:", err);
+    return res.status(500).json({ error: "Video yuklashda xatolik: " + (err?.message || "Noma'lum xatolik") });
+  }
+});
 
 app.post("/api/reels/upload-start", authenticateToken, (req: any, res: any) => {
   try {

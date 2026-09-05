@@ -41,6 +41,7 @@ const Donat = lazy(() => import('./pages/Donat'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const SupportBot = lazy(() => import('./pages/SupportBot'));
 const Reels = lazy(() => import('./pages/Reels'));
+const Upload = lazy(() => import('./pages/Upload'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const DMCA = lazy(() => import('./pages/DMCA'));
@@ -57,8 +58,9 @@ export default function App() {
   const [showTelegramBanner, setShowTelegramBanner] = useState(true);
   
   const location = useLocation();
-  const isSupportBot = location.pathname === '/support';
-  const isReels = location.pathname === '/reels' || location.pathname.startsWith('/reels');
+  const rawPath = location.pathname.replace(/^\/(uz|ru|ing|en)(\/|$)/, '/');
+  const isSupportBot = rawPath === '/support' || location.pathname === '/support';
+  const isReels = rawPath === '/reels' || rawPath.startsWith('/reels') || location.pathname.includes('/reels');
 
   // Scroll to top on route change
   useEffect(() => {
@@ -265,6 +267,10 @@ export default function App() {
               {/* Reels Routes */}
               <Route path="/reels" element={<Reels />} />
               <Route path="/:lang/reels" element={<Reels />} />
+
+              {/* Upload Routes */}
+              <Route path="/upload" element={<Upload />} />
+              <Route path="/:lang/upload" element={<Upload />} />
 
               <Route path="/jadval" element={<Jadval />} />
               <Route path="/:lang/jadval" element={<Jadval />} />
