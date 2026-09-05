@@ -3519,17 +3519,54 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
     
     // "mp4 bolib yuklansin ffpmeg orqali hls namoish etilsin" (upload as mp4, show as hls via ffmpeg).
 
-    const mediaId = uploadId;
-    
-    // Store raw video directly in PostgreSQL database
+    // Upload combined mp4 to Catbox.moe for instant high-speed streaming
+    let catboxUrl = `/api/video/${uploadId}`;
     try {
       const fileBuffer = fs.readFileSync(finalPath);
-      await pgPool.query(
-        "INSERT INTO video (id, filename, mime_type, data, size) VALUES ($1, $2, $3, $4, $5)",
-        [mediaId, "video.mp4", 'video/mp4', fileBuffer, uploadInfo.totalSize]
-      );
-    } catch(dbErr) {
-      console.error("PostgreSQL DB insert error:", dbErr);
+      const boundary = "------------------" + Math.random().toString(16);
+      
+      let header = `--${boundary}\r\n`;
+      header += `Content-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n`;
+      header += `--${boundary}\r\n`;
+      header += `Content-Disposition: form-data; name="fileToUpload"; filename="video.mp4"\r\n`;
+      header += `Content-Type: video/mp4\r\n\r\n`;
+
+      const footer = `\r\n--${boundary}--\r\n`;
+      
+      const payload = Buffer.concat([
+        Buffer.from(header, "utf-8"),
+        fileBuffer,
+        Buffer.from(footer, "utf-8")
+      ]);
+
+      const catboxRes = await fetch("https://catbox.moe/user/api.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          "User-Agent": "Mozilla/5.0"
+        },
+        body: payload
+      });
+
+      if (catboxRes.ok) {
+        const resultText = await catboxRes.text();
+        if (resultText && resultText.startsWith("http")) {
+          catboxUrl = resultText.trim();
+        }
+      }
+    } catch (catErr) {
+      console.error("Catbox upload error, fallback to local streaming:", catErr);
+      // Store in DB as fallback
+      try {
+        const fileBuffer = fs.readFileSync(finalPath);
+        await pgPool.query(
+          "INSERT INTO video (id, filename, mime_type, data, size) VALUES ($1, $2, $3, $4, $5)",
+          [uploadId, "video.mp4", 'video/mp4', fileBuffer, uploadInfo.totalSize]
+        );
+        catboxUrl = `/api/video/${uploadId}`;
+      } catch (dbErr) {
+        console.error("DB fallback error:", dbErr);
+      }
     } finally {
       if (fs.existsSync(finalPath)) {
         try { fs.unlinkSync(finalPath); } catch (e) {}
@@ -3538,7 +3575,7 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
     
     activeReelUploads.delete(uploadId);
     
-    res.status(201).json({ url: `/api/video/${mediaId}`, success: true });
+    res.status(201).json({ url: catboxUrl, success: true });
     
   } catch (err: any) {
     console.error("HLS conversion error:", err);
