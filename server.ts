@@ -3057,6 +3057,12 @@ app.get("/api/reels", async (req: any, res: any) => {
     const [rows]: any = await dbQuery(sql, params);
 
     if (Array.isArray(rows)) {
+      // Shuffle randomly on server side so every request/user gets a random order
+      for (let i = rows.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rows[i], rows[j]] = [rows[j], rows[i]];
+      }
+
       const formatted = rows.map((row: any) => ({
         ...row,
         is_liked: Boolean(row.is_liked),
