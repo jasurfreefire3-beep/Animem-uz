@@ -42,17 +42,26 @@ export const uploadVideoInChunks = async (
   token: string, 
   onProgress: (progress: number, text: string) => void
 ): Promise<string> => {
+  const configuredApiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+  const apiBase = configuredApiBase || (
+    typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      ? 'https://animem.uz'
+      : ''
+  );
+
   onProgress(20, "Video yuklanmoqda...");
 
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch("/api/reels/upload", {
+  const res = await fetch(`${apiBase}/api/reels/upload`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json"
     },
-    body: formData
+    body: formData,
+    cache: "no-store"
   });
 
   onProgress(90, "Video bazaga saqlanmoqda...");
