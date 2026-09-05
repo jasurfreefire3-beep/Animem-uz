@@ -53,7 +53,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef<boolean>(false);
 
-  // Fetch reels from API
+  // Fetch reels from API and shuffle randomly
   const fetchReels = useCallback(() => {
     setLoading(true);
     const token = localStorage.getItem('token');
@@ -63,7 +63,26 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
-          setReels(data);
+          // Shuffle randomly (Fisher-Yates)
+          const shuffled = [...data];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+
+          // Check if URL has ?id=... or similar
+          const params = new URLSearchParams(window.location.search);
+          const reelIdParam = params.get('id');
+          if (reelIdParam) {
+            const targetIdx = shuffled.findIndex((r) => String(r.id) === String(reelIdParam));
+            if (targetIdx !== -1) {
+              // Move target to top
+              const [targetReel] = shuffled.splice(targetIdx, 1);
+              shuffled.unshift(targetReel);
+            }
+          }
+
+          setReels(shuffled);
         }
         setLoading(false);
       })
@@ -76,6 +95,15 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
   useEffect(() => {
     fetchReels();
   }, [fetchReels]);
+
+  // Update browser URL when activeIndex changes
+  useEffect(() => {
+    if (reels.length > 0 && reels[activeIndex]) {
+      const currentReel = reels[activeIndex];
+      const newUrl = `/reels?id=${currentReel.id}`;
+      window.history.replaceState({ id: currentReel.id }, '', newUrl);
+    }
+  }, [activeIndex, reels]);
 
   // Scroll to index helper
   const scrollToIndex = useCallback((index: number) => {
