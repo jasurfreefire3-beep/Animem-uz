@@ -15,6 +15,9 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
 import { GoogleGenAI } from "@google/genai";
+import { exec } from "child_process";
+import util from "util";
+const execPromise = util.promisify(exec);
 
 import compression from "compression";
 import webpush from "web-push";
@@ -3527,6 +3530,13 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
       );
     } catch(dbErr) {
       console.error("PostgreSQL DB insert error:", dbErr);
+    }
+
+    let hlsUrl = `/api/video/${mediaId}`;
+    try {
+      hlsUrl = await convertVideoToHls(finalPath, mediaId);
+    } catch (hlsErr) {
+      console.error("HLS conversion error:", hlsErr);
     } finally {
       if (fs.existsSync(finalPath)) {
         try { fs.unlinkSync(finalPath); } catch (e) {}
@@ -3535,7 +3545,7 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
     
     activeReelUploads.delete(uploadId);
     
-    res.status(201).json({ url: `/api/video/${mediaId}`, success: true });
+    res.status(201).json({ url: hlsUrl, success: true });
     
   } catch (err: any) {
     console.error("HLS conversion error:", err);
@@ -3544,10 +3554,27 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
 });
 
 
-app.get("/api/media/hls/:id/:file", (req: any, res: any) => {
+async function convertVideoToHls(inputPath: string, mediaId: string): Promise<string> {
+  const hlsDir = path.join(process.cwd(), "data", "hls", mediaId);
+  if (!fs.existsSync(hlsDir)) {
+    fs.mkdirSync(hlsDir, { recursive: true });
+  }
+  const playlistPath = path.join(hlsDir, "index.m3u8");
+  
+  const cmd = `ffmpeg -y -i "${inputPath}" -profile:v baseline -level 3.0 -s 720x1280 -start_number 0 -hls_time 3 -hls_list_size 0 -f hls "${playlistPath}"`;
+  try {
+    await execPromise(cmd);
+  } catch (err) {
+    console.warn("FFmpeg HLS conversion fallback:", err);
+    const fallbackCmd = `ffmpeg -y -i "${inputPath}" -c:v libx264 -c:a aac -start_number 0 -hls_time 3 -hls_list_size 0 -f hls "${playlistPath}"`;
+    await execPromise(fallbackCmd);
+  }
+  return `/api/hls/${mediaId}/index.m3u8`;
+}
+
+app.get("/api/hls/:id/:file", (req: any, res: any) => {
   const { id, file } = req.params;
-  const mediaDir = path.join(os.tmpdir(), "media");
-  const filePath = path.join(mediaDir, `${id}.temp_hls`, file);
+  const filePath = path.join(process.cwd(), "data", "hls", id, file);
   
   if (fs.existsSync(filePath)) {
     if (file.endsWith('.m3u8')) {
@@ -3555,11 +3582,25 @@ app.get("/api/media/hls/:id/:file", (req: any, res: any) => {
     } else if (file.endsWith('.ts')) {
       res.setHeader('Content-Type', 'video/MP2T');
     }
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('Access-Control-Allow-Origin', '*');
     fs.createReadStream(filePath).pipe(res);
   } else {
-    res.status(404).send("Not found");
+    // Fallback to old temp dir hls if exists
+    const mediaDir = path.join(os.tmpdir(), "media");
+    const oldFilePath = path.join(mediaDir, `${id}.temp_hls`, file);
+    if (fs.existsSync(oldFilePath)) {
+      if (file.endsWith('.m3u8')) {
+        res.setHeader('Content-Type', 'application/x-mpegURL');
+      } else if (file.endsWith('.ts')) {
+        res.setHeader('Content-Type', 'video/MP2T');
+      }
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      fs.createReadStream(oldFilePath).pipe(res);
+      return;
+    }
+    res.status(404).send("HLS file not found");
   }
 });
 app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (req: any, res: any) => {
@@ -3648,12 +3689,17 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
       try { fs.unlinkSync(tempFilePath); } catch (e) {}
     }
 
-    // Stream URL
-    const m3u8Url = `/api/video/${mediaId}`;
+    // Convert to HLS
+    let hlsUrl = `/api/video/${mediaId}`;
+    try {
+      hlsUrl = await convertVideoToHls(localDiskPath, mediaId);
+    } catch (hlsErr) {
+      console.error("HLS conversion error:", hlsErr);
+    }
 
     return res.status(201).json({
       success: true,
-      url: m3u8Url,
+      url: hlsUrl,
       media_id: mediaId
     });
   } catch (err: any) {
