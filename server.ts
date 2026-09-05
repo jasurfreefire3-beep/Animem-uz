@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs";
 import http from "http";
 import https from "https";
+import { Readable } from "stream";
 import { Server } from "socket.io";
 import mysql from "mysql2/promise";
 import { Pool as PgPool } from "pg";
@@ -137,6 +138,9 @@ const pgPool = new PgPool({
   ssl: { rejectUnauthorized: false }
 });
 
+const REELS_TELEGRAM_BOT_TOKEN = process.env.REELS_TELEGRAM_BOT_TOKEN || "";
+const REELS_TELEGRAM_CHANNEL_ID = process.env.REELS_TELEGRAM_CHANNEL_ID || "";
+
 // Initialize PostgreSQL Video Table
 async function initPgDb() {
   try {
@@ -150,12 +154,32 @@ async function initPgDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    await pgPool.query("ALTER TABLE video ADD COLUMN IF NOT EXISTS telegram_file_id VARCHAR(255)");
     console.log("Verified video table in PostgreSQL.");
   } catch (err) {
     console.error("Failed to initialize PostgreSQL video table:", err);
   }
 }
 initPgDb();
+
+async function uploadReelToTelegram(file: Express.Multer.File, fileBuffer: Buffer): Promise<string | null> {
+  if (!REELS_TELEGRAM_BOT_TOKEN || !REELS_TELEGRAM_CHANNEL_ID) return null;
+
+  const form = new FormData();
+  form.append("chat_id", REELS_TELEGRAM_CHANNEL_ID);
+  form.append("video", new Blob([fileBuffer], { type: file.mimetype || "video/mp4" }), file.originalname || "reel.mp4");
+  form.append("supports_streaming", "true");
+
+  const response = await fetch(`https://api.telegram.org/bot${REELS_TELEGRAM_BOT_TOKEN}/sendVideo`, {
+    method: "POST",
+    body: form,
+  });
+  const result: any = await response.json();
+  if (!response.ok || !result.ok || !result.result?.video?.file_id) {
+    throw new Error(result.description || "Telegram video upload failed");
+  }
+  return result.result.video.file_id;
+}
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "db.fr-pari1.bengt.wasmernet.com",
@@ -3619,11 +3643,18 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
       console.warn("Disk media save warning:", diskErr);
     }
 
-    // Store raw video directly in PostgreSQL database for streaming via /api/video/:id
+    let telegramFileId: string | null = null;
+    try {
+      telegramFileId = await uploadReelToTelegram(req.file, fileBuffer);
+    } catch (telegramErr: any) {
+      console.warn("Telegram reel upload warning:", telegramErr?.message || telegramErr);
+    }
+
+    // Keep a local copy as a reliable fallback if Telegram is unavailable.
     try {
       await pgPool.query(
-        "INSERT INTO video (id, filename, mime_type, data, size) VALUES ($1, $2, $3, $4, $5)",
-        [mediaId, filename, mimeType, fileBuffer, fileSize]
+        "INSERT INTO video (id, filename, mime_type, data, size, telegram_file_id) VALUES ($1, $2, $3, $4, $5, $6)",
+        [mediaId, filename, mimeType, fileBuffer, fileSize, telegramFileId]
       );
     } catch (pgErr) {
       console.error("PostgreSQL video insert error:", pgErr);
@@ -3653,11 +3684,12 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
     }
 
     // Stream URL
-    const m3u8Url = `/api/video/${mediaId}`;
+    const m3u8Url = telegramFileId ? `/api/reels/telegram/${mediaId}` : `/api/video/${mediaId}`;
 
     return res.status(201).json({
       success: true,
       url: m3u8Url,
+      storage: telegramFileId ? "telegram" : "postgres",
       media_id: mediaId
     });
   } catch (err: any) {
@@ -9300,6 +9332,46 @@ async function start() {
       }
     }));
     
+// Stream Telegram-backed Reels without exposing the bot token to the browser.
+app.get("/api/reels/telegram/:id", async (req: any, res: any) => {
+  if (!REELS_TELEGRAM_BOT_TOKEN) {
+    return res.status(503).json({ error: "Telegram video storage sozlanmagan" });
+  }
+
+  try {
+    const { rows } = await pgPool.query(
+      "SELECT telegram_file_id, mime_type FROM video WHERE id = $1",
+      [req.params.id]
+    );
+    const record = rows[0];
+    if (!record?.telegram_file_id) return res.redirect(`/api/video/${req.params.id}`);
+
+    const fileResponse = await fetch(`https://api.telegram.org/bot${REELS_TELEGRAM_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(record.telegram_file_id)}`);
+    const fileResult: any = await fileResponse.json();
+    const filePath = fileResult.result?.file_path;
+    if (!fileResponse.ok || !fileResult.ok || !filePath) {
+      return res.redirect(`/api/video/${req.params.id}`);
+    }
+
+    const videoResponse = await fetch(`https://api.telegram.org/file/bot${REELS_TELEGRAM_BOT_TOKEN}/${filePath}`, {
+      headers: req.headers.range ? { Range: req.headers.range } : undefined,
+    });
+    if (!videoResponse.ok || !videoResponse.body) return res.redirect(`/api/video/${req.params.id}`);
+
+    res.status(videoResponse.status);
+    res.setHeader("Content-Type", record.mime_type || "video/mp4");
+    res.setHeader("Accept-Ranges", "bytes");
+    for (const header of ["content-length", "content-range"]) {
+      const value = videoResponse.headers.get(header);
+      if (value) res.setHeader(header, value);
+    }
+    Readable.fromWeb(videoResponse.body as any).pipe(res);
+  } catch (err: any) {
+    console.error("Telegram reel stream error:", err);
+    return res.redirect(`/api/video/${req.params.id}`);
+  }
+});
+
 // Stream raw video directly from PostgreSQL
 app.get("/api/video/:id", async (req: any, res: any) => {
   try {
