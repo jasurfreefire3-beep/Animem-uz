@@ -7,6 +7,7 @@ import http from "http";
 import https from "https";
 import { Server } from "socket.io";
 import mysql from "mysql2/promise";
+import { Pool as PgPool } from "pg";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
@@ -127,6 +128,37 @@ const JWT_SECRET = process.env.JWT_SECRET || "anime_super_secret_key";
 const ANIMEBOT_SYNC_SECRET = process.env.ANIMEBOT_SYNC_SECRET || "";
 
 // MySQL Database Pool Connection
+
+// PostgreSQL Database Pool Connection for Videos
+const pgPool = new PgPool({
+  host: 'psql.fr-roub1.bengt.wasmernet.com',
+  port: 20184,
+  database: 'videosql',
+  user: 'user_7b829204',
+  password: 'pw_tg5oTgn1on6IZzimgSG8M5EJFPK9oY9j',
+  ssl: { rejectUnauthorized: false }
+});
+
+// Initialize PostgreSQL Video Table
+async function initPgDb() {
+  try {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS video (
+        id VARCHAR(255) PRIMARY KEY,
+        filename VARCHAR(255),
+        mime_type VARCHAR(100),
+        data BYTEA,
+        size BIGINT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log("Verified video table in PostgreSQL.");
+  } catch (err) {
+    console.error("Failed to initialize PostgreSQL video table:", err);
+  }
+}
+initPgDb();
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "db.fr-pari1.bengt.wasmernet.com",
   port: Number(process.env.DB_PORT) || 10272,
@@ -2520,9 +2552,10 @@ app.post("/api/media/upload", authenticateToken, memoryUpload.single("file"), as
 
     // Save directly into MySQL database (media_files table) - no disk involved
     try {
-      await dbQuery(
-        `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?)`,
-        [mediaId, filename, mimeType, base64String, fileSize]
+      // Store raw bytes to postgresql
+      await pgPool.query(
+        "INSERT INTO video (id, filename, mime_type, data, size) VALUES ($1, $2, $3, $4, $5)",
+        [mediaId, filename, mimeType, fileBuffer, fileSize]
       );
       console.log(`[MySQL DB] Stored media image #${mediaId} (${filename}, ${fileSize} bytes) into database`);
     } catch (dbErr) {
@@ -3494,15 +3527,20 @@ app.post("/api/reels/upload-finish", authenticateToken, async (req: any, res: an
 
     const mediaId = uploadId;
     
-    // Store in database
-    const [result] = await pool.execute(
-      "INSERT INTO media (id, mime_type, file_size, data) VALUES (?, ?, ?, ?)",
-      [mediaId, 'application/x-mpegURL', uploadInfo.totalSize, null]
-    );
+    // Store raw video directly in PostgreSQL database
+    try {
+      const fileBuffer = fs.readFileSync(finalPath);
+      await pgPool.query(
+        "INSERT INTO video (id, filename, mime_type, data, size) VALUES ($1, $2, $3, $4, $5)",
+        [mediaId, "video.mp4", 'video/mp4', fileBuffer, uploadInfo.totalSize]
+      );
+    } catch(dbErr) {
+      console.error("PostgreSQL DB insert error:", dbErr);
+    }
     
     activeReelUploads.delete(uploadId);
     
-    res.status(201).json({ url: `/api/media/hls/${mediaId}/video.m3u8`, success: true });
+    res.status(201).json({ url: `/api/video/${mediaId}`, success: true });
     
   } catch (err: any) {
     console.error("HLS conversion error:", err);
@@ -3606,7 +3644,7 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
     }
 
     // Stream URL
-    const m3u8Url = `/api/reels/stream/${mediaId}.m3u8`;
+    const m3u8Url = `/api/video/${mediaId}`;
 
     return res.status(201).json({
       success: true,
@@ -9252,7 +9290,50 @@ async function start() {
         }
       }
     }));
-    app.get("*", (req, res) => {
+    
+// Stream raw video directly from PostgreSQL
+app.get("/api/video/:id", async (req: any, res: any) => {
+  try {
+    const videoId = req.params.id;
+    const { rows } = await pgPool.query("SELECT mime_type, data, size, filename FROM video WHERE id = $1", [videoId]);
+    
+    if (rows.length === 0 || !rows[0].data) {
+      return res.status(404).send("Video PostgreSQL bazasidan topilmadi");
+    }
+
+    const video = rows[0];
+    const videoSize = video.size || video.data.length;
+    const range = req.headers.range;
+
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : videoSize - 1;
+      
+      const chunksize = (end - start) + 1;
+      const fileBuffer = video.data.slice(start, end + 1);
+
+      res.writeHead(206, {
+        "Content-Range": `bytes ${start}-${end}/${videoSize}`,
+        "Accept-Ranges": "bytes",
+        "Content-Length": chunksize,
+        "Content-Type": video.mime_type || "video/mp4",
+      });
+      res.end(fileBuffer);
+    } else {
+      res.writeHead(200, {
+        "Content-Length": videoSize,
+        "Content-Type": video.mime_type || "video/mp4",
+      });
+      res.end(video.data);
+    }
+  } catch (err: any) {
+    console.error("PostgreSQL video stream error:", err);
+    res.status(500).send("Server xatosi");
+  }
+});
+
+  app.get("*", (req, res) => {
       handleDynamicSEO(req, res);
     });
   }
