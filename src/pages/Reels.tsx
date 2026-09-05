@@ -442,7 +442,29 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
         className="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-none no-scrollbar flex flex-col relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         style={{ scrollBehavior: 'smooth', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {reels.map((reel, index) => {
+        {reels.length === 0 ? (
+          <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-pink-400">
+              <Film className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-white">Hozircha videolar mavjud emas</h2>
+            <p className="text-sm text-white/60 max-w-sm">Birinchi bo'lib qiziqarli Reel video yuklang!</p>
+            <button
+              onClick={() => {
+                if (!currentUser) {
+                  alert("Reel qo'shish uchun avval profilingizga kiring!");
+                  return;
+                }
+                setShowAddModal(true);
+              }}
+              className="flex items-center space-x-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-sm font-bold px-5 py-2.5 rounded-full shadow-xl transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Video yuklash</span>
+            </button>
+          </div>
+        ) : (
+          reels.map((reel, index) => {
           const isActive = index === activeIndex;
 
           return (
@@ -615,7 +637,8 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
               </div>
             </div>
           );
-        })}
+        })
+      )}
       </div>
 
       {/* Comments Drawer Modal */}
