@@ -98,7 +98,7 @@ export default function App() {
 
   if (isReels) {
     return (
-      <div className="h-[100dvh] w-screen overflow-hidden bg-black text-white select-none">
+      <div className="fixed inset-0 h-[100dvh] w-full overflow-hidden bg-black text-white select-none">
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/reels" element={<Reels />} />

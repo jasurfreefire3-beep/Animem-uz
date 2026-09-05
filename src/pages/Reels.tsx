@@ -331,6 +331,8 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
           video_url: newVideoUrl,
           thumbnail_url: newThumbnailUrl,
           tags: newTags,
+          author_name: currentUser?.username || currentUser?.name || 'Foydalanuvchi',
+          author_avatar: currentUser?.avatar_url || 'https://files.catbox.moe/45hoi6.png',
         }),
       });
 
@@ -385,18 +387,18 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
     <div className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center select-none">
       
       {/* Top Left Navigation: Back to Home and Add Video Buttons */}
-      <div className="absolute top-4 left-4 md:left-8 z-40 flex items-center space-x-2.5 pointer-events-auto">
+      <div className="absolute top-3 left-3 sm:top-4 sm:left-6 md:left-8 z-40 flex items-center space-x-2 pointer-events-auto">
         {/* Back to Home Button */}
         <a
           href="/"
-          className="flex items-center space-x-2 bg-black/60 hover:bg-black/80 text-white px-3.5 py-2 rounded-full backdrop-blur-md border border-white/20 shadow-xl transition-all cursor-pointer active:scale-95"
+          className="flex items-center space-x-1.5 bg-black/60 hover:bg-black/80 text-white px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full backdrop-blur-md border border-white/20 shadow-xl transition-all cursor-pointer active:scale-95"
           title="Bosh sahifaga qaytish"
         >
           <ArrowLeft className="w-4 h-4" />
           <span className="text-xs font-bold tracking-wide">Bosh sahifa</span>
         </a>
 
-        {/* Add Reel button (moved to left side so it never blocks mute/unmute) */}
+        {/* Add Reel button */}
         <button
           onClick={() => {
             if (!currentUser) {
@@ -405,7 +407,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
             }
             setShowAddModal(true);
           }}
-          className="flex items-center space-x-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-xl transition-all active:scale-95 border border-pink-400/30 cursor-pointer backdrop-blur-md"
+          className="flex items-center space-x-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-bold px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full shadow-xl transition-all active:scale-95 border border-pink-400/30 cursor-pointer backdrop-blur-md"
           title="Video qo'shish"
         >
           <Plus className="w-4 h-4" />
@@ -447,13 +449,13 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
             <div
               key={reel.id}
               data-index={index}
-              className="w-full h-full shrink-0 snap-start snap-always relative bg-black flex items-center justify-center p-2 sm:p-4"
+              className="w-full h-full shrink-0 snap-start snap-always relative bg-black flex items-center justify-center p-0 md:p-3 lg:p-4 overflow-hidden"
             >
-              {/* Instagram Style Layout: Video Player + OUTSIDE Action Buttons on the Right */}
-              <div className="flex items-end justify-center gap-3 sm:gap-4 md:gap-5 h-full max-h-[92vh] pt-12 pb-3 relative">
+              {/* Responsive Container: Fullscreen on Mobile, Centered with Outside Buttons on Desktop */}
+              <div className="relative w-full h-full md:h-auto md:max-h-[88vh] md:flex md:items-end md:justify-center md:gap-4 lg:gap-5">
                 
-                {/* 1. Video Player Container - Exact Video Aspect Ratio */}
-                <div className="relative h-full max-h-[86vh] aspect-[9/16] bg-black rounded-2xl overflow-hidden shadow-[0_10px_50px_rgba(0,0,0,0.9)] border border-white/10 flex items-center justify-center shrink-0">
+                {/* 1. Video Player Container */}
+                <div className="relative w-full h-full md:w-auto md:h-full md:max-h-[86vh] md:aspect-[9/16] bg-black md:rounded-2xl overflow-hidden md:shadow-[0_10px_50px_rgba(0,0,0,0.9)] md:border md:border-white/10 flex items-center justify-center shrink-0">
                   <ReelsPlayer
                     id={reel.id}
                     url={reel.video_url}
@@ -466,7 +468,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                   />
 
                   {/* Video Metadata Overlay at bottom of player */}
-                  <div className="absolute left-0 right-0 bottom-0 p-4 pt-10 bg-gradient-to-t from-black/95 via-black/50 to-transparent pointer-events-none flex flex-col space-y-2 z-20">
+                  <div className="absolute left-0 right-14 sm:right-16 md:right-0 bottom-0 p-3 sm:p-4 pt-12 bg-gradient-to-t from-black/95 via-black/50 to-transparent pointer-events-none flex flex-col space-y-1.5 sm:space-y-2 z-20">
                     {/* Author & Anime Tag */}
                     <div className="flex items-center space-x-2.5 pointer-events-auto">
                       <a
@@ -476,7 +478,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                         <img
                           src={reel.author_avatar || 'https://files.catbox.moe/45hoi6.png'}
                           alt={reel.author_name}
-                          className="w-8 h-8 rounded-full object-cover border-2 border-pink-500 shadow-md"
+                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-pink-500 shadow-md"
                           onError={(e) => {
                             (e.currentTarget as HTMLImageElement).src = 'https://files.catbox.moe/45hoi6.png';
                           }}
@@ -485,13 +487,13 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                       <div className="flex flex-col min-w-0">
                         <a
                           href={reel.user_id ? `/user/${reel.user_id}` : '#'}
-                          className="font-bold text-white text-sm drop-shadow-md hover:underline truncate cursor-pointer"
+                          className="font-bold text-white text-xs sm:text-sm drop-shadow-md hover:underline truncate cursor-pointer"
                         >
                           @{reel.author_name || 'Animem.uz'}
                         </a>
                       </div>
                       {reel.anime_title && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-pink-500/30 text-pink-200 border border-pink-400/20 backdrop-blur-sm truncate max-w-[130px]">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-pink-500/30 text-pink-200 border border-pink-400/20 backdrop-blur-sm truncate max-w-[120px] sm:max-w-[150px]">
                           {reel.anime_title}
                         </span>
                       )}
@@ -503,7 +505,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                     </p>
 
                     {reel.tags && (
-                      <div className="flex flex-wrap gap-1.5 text-[11px] text-pink-300/90 font-medium">
+                      <div className="flex flex-wrap gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-pink-300/90 font-medium">
                         {reel.tags.split(' ').filter(Boolean).map((t, idx) => (
                           <span key={idx}>{t}</span>
                         ))}
@@ -511,18 +513,20 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                     )}
 
                     {/* Audio Ticker */}
-                    <div className="flex items-center space-x-2 text-white/80 text-[11px] font-medium pt-0.5 pointer-events-auto">
+                    <div className="flex items-center space-x-1.5 sm:space-x-2 text-white/80 text-[10px] sm:text-[11px] font-medium pt-0.5 pointer-events-auto">
                       <Music2 className="w-3.5 h-3.5 animate-pulse text-pink-400 shrink-0" />
                       <span className="truncate">Asl audio - {reel.anime_title || reel.author_name || 'Animem.uz'}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* 2. ACTION BUTTONS OUTSIDE THE PLAYER (Right Side!) */}
-                <div className="flex flex-col items-center space-y-4 pb-2 z-30 shrink-0 select-none">
+                {/* 2. ACTION BUTTONS:
+                    - Mobile: Floating on the right side over the video
+                    - Desktop: Outside the player on the right side */}
+                <div className="absolute right-2.5 sm:right-4 md:relative md:right-auto bottom-16 sm:bottom-20 md:bottom-auto flex flex-col items-center space-y-3 sm:space-y-4 md:pb-2 z-30 shrink-0 select-none">
                   
-                  {/* Author Profile Picture (Outside player) */}
-                  <div className="relative mb-1 group">
+                  {/* Author Profile Picture */}
+                  <div className="relative mb-0.5 sm:mb-1 group">
                     <a
                       href={reel.user_id ? `/user/${reel.user_id}` : '#'}
                       className="block relative active:scale-95 transition-transform"
@@ -531,7 +535,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                       <img
                         src={reel.author_avatar || 'https://files.catbox.moe/45hoi6.png'}
                         alt={reel.author_name}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-pink-500 shadow-xl group-hover:scale-105 transition-transform"
+                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-pink-500 shadow-xl group-hover:scale-105 transition-transform"
                         onError={(e) => {
                           (e.currentTarget as HTMLImageElement).src = 'https://files.catbox.moe/45hoi6.png';
                         }}
@@ -543,19 +547,19 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                   <button
                     type="button"
                     onClick={() => handleToggleLike(reel.id)}
-                    className="flex flex-col items-center space-y-1 text-white group active:scale-90 transition-transform cursor-pointer"
+                    className="flex flex-col items-center space-y-0.5 sm:space-y-1 text-white group active:scale-90 transition-transform cursor-pointer"
                     title="Yoqdi"
                   >
-                    <div className={`p-3 rounded-full backdrop-blur-md transition-all ${
-                      reel.is_liked ? 'bg-pink-600/40 text-pink-500 ring-2 ring-pink-500/50 shadow-[0_0_20px_rgba(236,72,153,0.5)]' : 'bg-white/10 hover:bg-white/20 text-white'
+                    <div className={`p-2.5 sm:p-3 rounded-full backdrop-blur-md transition-all ${
+                      reel.is_liked ? 'bg-pink-600/40 text-pink-500 ring-2 ring-pink-500/50 shadow-[0_0_20px_rgba(236,72,153,0.5)]' : 'bg-black/40 md:bg-white/10 hover:bg-white/20 text-white'
                     }`}>
                       <Heart
-                        className={`w-7 h-7 transition-all ${
+                        className={`w-6 h-6 sm:w-7 sm:h-7 transition-all ${
                           reel.is_liked ? 'fill-pink-500 text-pink-500 scale-110' : 'text-white'
                         }`}
                       />
                     </div>
-                    <span className="text-xs font-bold drop-shadow-md text-white/90">
+                    <span className="text-[11px] sm:text-xs font-bold drop-shadow-md text-white/90">
                       {formatCount(reel.likes_count)}
                     </span>
                   </button>
@@ -564,13 +568,13 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                   <button
                     type="button"
                     onClick={() => setActiveCommentsReel(reel)}
-                    className="flex flex-col items-center space-y-1 text-white group active:scale-90 transition-transform cursor-pointer"
+                    className="flex flex-col items-center space-y-0.5 sm:space-y-1 text-white group active:scale-90 transition-transform cursor-pointer"
                     title="Izohlar"
                   >
-                    <div className="p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all">
-                      <MessageCircle className="w-7 h-7 text-white" />
+                    <div className="p-2.5 sm:p-3 rounded-full bg-black/40 md:bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all">
+                      <MessageCircle className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                     </div>
-                    <span className="text-xs font-bold drop-shadow-md text-white/90">
+                    <span className="text-[11px] sm:text-xs font-bold drop-shadow-md text-white/90">
                       {formatCount(reel.comments_count)}
                     </span>
                   </button>
@@ -579,13 +583,13 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                   <button
                     type="button"
                     onClick={() => setActiveShareReel(reel)}
-                    className="flex flex-col items-center space-y-1 text-white group active:scale-90 transition-transform cursor-pointer"
+                    className="flex flex-col items-center space-y-0.5 sm:space-y-1 text-white group active:scale-90 transition-transform cursor-pointer"
                     title="Ulashish"
                   >
-                    <div className="p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all">
-                      <Share2 className="w-7 h-7 text-white" />
+                    <div className="p-2.5 sm:p-3 rounded-full bg-black/40 md:bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all">
+                      <Share2 className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                     </div>
-                    <span className="text-xs font-bold drop-shadow-md text-white/90">
+                    <span className="text-[11px] sm:text-xs font-bold drop-shadow-md text-white/90">
                       {formatCount(reel.shares_count)}
                     </span>
                   </button>
@@ -596,12 +600,12 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                       type="button"
                       onClick={() => handleDeleteReel(reel.id)}
                       title="Reelni o'chirish"
-                      className="flex flex-col items-center space-y-1 text-red-400 hover:text-red-300 group active:scale-90 transition-transform cursor-pointer"
+                      className="flex flex-col items-center space-y-0.5 sm:space-y-1 text-red-400 hover:text-red-300 group active:scale-90 transition-transform cursor-pointer"
                     >
-                      <div className="p-3 rounded-full bg-red-600/30 hover:bg-red-600/50 backdrop-blur-md border border-red-500/30 transition-all">
-                        <Trash2 className="w-6 h-6 text-red-300" />
+                      <div className="p-2.5 sm:p-3 rounded-full bg-red-600/30 hover:bg-red-600/50 backdrop-blur-md border border-red-500/30 transition-all">
+                        <Trash2 className="w-5 h-5 sm:w-6 sm:h-6 text-red-300" />
                       </div>
-                      <span className="text-[10px] font-semibold text-red-200">
+                      <span className="text-[9px] sm:text-[10px] font-semibold text-red-200">
                         O'chirish
                       </span>
                     </button>

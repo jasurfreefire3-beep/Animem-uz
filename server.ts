@@ -3336,8 +3336,31 @@ app.post("/api/reels", authenticateToken, async (req: any, res: any) => {
     const reelTags = (tags || "").trim() || "#anime #reels #animemuz";
 
     const currentUserId = req.user?.id ? Number(req.user.id) : null;
-    const authorName = req.user?.name || (req.user?.role === "admin" ? "Animem.uz" : "Foydalanuvchi");
-    const authorAvatar = req.user?.avatar_url || "https://files.catbox.moe/45hoi6.png";
+    let authorName = (req.body?.author_name || "").trim();
+    let authorAvatar = (req.body?.author_avatar || "").trim();
+
+    if (currentUserId) {
+      try {
+        const [uRows]: any = await dbQuery(
+          "SELECT id, name, username, avatar_url FROM users WHERE id = ?",
+          [currentUserId]
+        );
+        if (uRows && uRows.length > 0) {
+          const u = uRows[0];
+          authorName = u.username || u.name || authorName || "Foydalanuvchi";
+          authorAvatar = u.avatar_url || authorAvatar || "https://files.catbox.moe/45hoi6.png";
+        }
+      } catch (e) {
+        console.warn("Fetch user for reel upload failed:", e);
+      }
+    }
+
+    if (!authorName) {
+      authorName = req.user?.name || (req.user?.role === "admin" ? "Animem.uz" : "Foydalanuvchi");
+    }
+    if (!authorAvatar) {
+      authorAvatar = req.user?.avatar_url || "https://files.catbox.moe/45hoi6.png";
+    }
 
     let insertedId = Date.now();
     try {
