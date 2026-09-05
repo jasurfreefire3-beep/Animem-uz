@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { uploadVideoInChunks } from '../utils/upload';
+import { uploadReelVideo } from '../utils/upload';
 import { useAuth } from '../context/AuthContext';
 import { User, Anime, toSlug } from '../types';
 import ReelsPlayer from "../components/ReelsPlayer";
@@ -268,7 +268,7 @@ export default function Profil() {
     setUploadProgressText("Boshlanmoqda...");
 
     try {
-      const finalUrl = await uploadVideoInChunks(file, token, (progress, text) => {
+      const finalUrl = await uploadReelVideo(file, token, (progress, text) => {
         setUploadProgressPercent(progress);
         setUploadProgressText(text);
       });

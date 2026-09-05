@@ -1,4 +1,4 @@
-import { uploadVideoInChunks } from "../utils/upload";
+import { uploadReelVideo } from "../utils/upload";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -291,7 +291,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
     setUploadProgressText("Boshlanmoqda...");
 
     try {
-      const finalUrl = await uploadVideoInChunks(file, token, (progress, text) => {
+      const finalUrl = await uploadReelVideo(file, token, (progress, text) => {
         setUploadProgressPercent(progress);
         setUploadProgressText(text);
       });
