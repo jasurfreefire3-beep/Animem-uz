@@ -1,3 +1,4 @@
+import { uploadVideoInChunks } from "../utils/upload";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Heart, 
@@ -223,6 +224,9 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
     }
   };
 
+  const [uploadProgressText, setUploadProgressText] = useState('');
+  const [uploadProgressPercent, setUploadProgressPercent] = useState(0);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -243,38 +247,25 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
 
     setIsUploading(true);
     setAddError('');
-    const formData = new FormData();
-    formData.append('file', file);
+    setUploadProgressPercent(0);
+    setUploadProgressText("Boshlanmoqda...");
 
     try {
-      const res = await fetch('/api/reels/upload', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
+      const finalUrl = await uploadVideoInChunks(file, token, (progress, text) => {
+        setUploadProgressPercent(progress);
+        setUploadProgressText(text);
       });
 
-      let data: any = null;
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(res.status === 413 ? "Video hajmi juda katta!" : (text.slice(0, 80) || "Serverda xatolik yuz berdi"));
-      }
-
-      if (res.ok && data?.url) {
-        setNewVideoUrl(data.url);
-        const sizeFormatted = (file.size / (1024 * 1024)).toFixed(1);
-        setSelectedFileName(`${file.name} (${sizeFormatted} MB)`);
-      } else {
-        setAddError(data?.error || "Video yuklashda xatolik");
-      }
+      setNewVideoUrl(finalUrl);
+      const sizeFormatted = (file.size / (1024 * 1024)).toFixed(1);
+      setSelectedFileName(`${file.name} (${sizeFormatted} MB)`);
     } catch (err: any) {
       setAddError(err?.message || "Video yuklashda xatolik");
     } finally {
       setIsUploading(false);
+      setUploadProgressText('');
+      setUploadProgressPercent(0);
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -671,15 +662,41 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
 
               <div>
                 <label className="block text-xs font-semibold text-white/70 mb-1">
-                  Muqova (Poster/Thumbnail) URL
+                  Muqova (Poster) Rasm (Ixtiyoriy)
                 </label>
-                <input
-                  type="text"
-                  placeholder="https://..."
-                  value={newThumbnailUrl}
-                  onChange={(e) => setNewThumbnailUrl(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-pink-500"
-                />
+                <label className="flex items-center justify-center p-3 rounded-xl border border-dashed border-white/20 hover:border-pink-500 bg-white/5 cursor-pointer transition-colors text-white/60 text-xs text-center space-x-2">
+                  <Upload className="w-4 h-4" />
+                  <span>Rasm tanlash (JPG/PNG)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if(!file) return;
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch('/api/media/upload', {
+                          method: 'POST',
+                          headers: { Authorization: `Bearer ${token}` },
+                          body: fd
+                        });
+                        if(res.ok) {
+                          const d = await res.json();
+                          setNewThumbnailUrl(d.url);
+                        }
+                      } catch(err) {}
+                    }}
+                  />
+                </label>
+                {newThumbnailUrl && (
+                  <div className="mt-2 flex items-center justify-between bg-white/5 rounded-lg p-2">
+                    <span className="text-[10px] text-emerald-400 truncate flex-1">✓ Rasm saqlandi</span>
+                    <img src={newThumbnailUrl} alt="Thumb" className="h-8 w-8 object-cover rounded ml-2" />
+                  </div>
+                )}
               </div>
 
               <div>

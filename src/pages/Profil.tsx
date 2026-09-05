@@ -1,7 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { uploadVideoInChunks } from '../utils/upload';
 import { useAuth } from '../context/AuthContext';
 import { User, Anime, toSlug } from '../types';
+import ReelsPlayer from "../components/ReelsPlayer";
 import { 
   Shield, Clock, Heart, MessageSquare, Edit3, Save, Camera, 
   Loader2, Globe, Send, Instagram, Youtube, Tv, Share2, 
@@ -239,6 +242,9 @@ export default function Profil() {
     }
   };
 
+  const [uploadProgressText, setUploadProgressText] = useState('');
+  const [uploadProgressPercent, setUploadProgressPercent] = useState(0);
+
   const handleUploadReelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -258,34 +264,18 @@ export default function Profil() {
 
     setUploadingReel(true);
     setReelUploadError('');
-    const formData = new FormData();
-    formData.append('file', file);
+    setUploadProgressPercent(0);
+    setUploadProgressText("Boshlanmoqda...");
 
     try {
-      const res = await fetch('/api/reels/upload', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        body: formData
+      const finalUrl = await uploadVideoInChunks(file, token, (progress, text) => {
+        setUploadProgressPercent(progress);
+        setUploadProgressText(text);
       });
 
-      let data: any = null;
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(res.status === 413 ? "Video hajmi juda katta!" : (text.slice(0, 80) || "Serverda xatolik yuz berdi"));
-      }
-
-      if (res.ok && data?.url) {
-        setReelVideoUrl(data.url);
-        const sizeFormatted = (file.size / (1024 * 1024)).toFixed(1);
-        setSelectedReelFileName(`${file.name} (${sizeFormatted} MB)`);
-      } else {
-        setReelUploadError(data?.error || "Video yuklashda xatolik yuz berdi");
-      }
+      setReelVideoUrl(finalUrl);
+      const sizeFormatted = (file.size / (1024 * 1024)).toFixed(1);
+      setSelectedReelFileName(`${file.name} (${sizeFormatted} MB)`);
     } catch (err: any) {
       setReelUploadError(err?.message || "Video yuklashda xatolik yuz berdi");
     } finally {
@@ -1348,6 +1338,12 @@ export default function Profil() {
                     />
                   </label>
 
+                  {uploadingReel && uploadProgressText && (
+                    <div className="mt-2 text-xs font-semibold text-pink-400 bg-pink-500/10 rounded-xl px-3 py-2 border border-pink-500/20 text-center animate-pulse">
+                      {uploadProgressText}
+                    </div>
+                  )}
+
                   {reelVideoUrl && (
                     <div className="mt-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 select-none">
                       <Check size={16} className="shrink-0 text-emerald-400" />
@@ -1360,15 +1356,40 @@ export default function Profil() {
 
                 <div>
                   <label className="block text-xs font-semibold text-white/70 mb-1">
-                    Muqova (Poster / Thumbnail) Rasm URL (Ixtiyoriy)
+                    Muqova (Poster) Rasm (Ixtiyoriy)
                   </label>
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    value={reelThumbnailUrl}
-                    onChange={(e) => setReelThumbnailUrl(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-pink-500"
-                  />
+                  <label className="flex items-center justify-center p-3 rounded-xl border border-dashed border-white/20 hover:border-pink-500 bg-white/5 cursor-pointer transition-colors text-white/60 text-xs text-center space-x-2">
+                    <Upload className="w-4 h-4" />
+                    <span>Rasm tanlash (JPG/PNG)</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if(!file) return;
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        try {
+                          const res = await fetch('/api/media/upload', {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${token}` },
+                            body: fd
+                          });
+                          if(res.ok) {
+                            const d = await res.json();
+                            setReelThumbnailUrl(d.url);
+                          }
+                        } catch(err) {}
+                      }}
+                    />
+                  </label>
+                  {reelThumbnailUrl && (
+                    <div className="mt-2 flex items-center justify-between bg-white/5 rounded-lg p-2">
+                      <span className="text-[10px] text-emerald-400 truncate flex-1">✓ Rasm saqlandi</span>
+                      <img src={reelThumbnailUrl} alt="Thumb" className="h-8 w-8 object-cover rounded ml-2" />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1434,17 +1455,14 @@ export default function Profil() {
                 className="aspect-[9/16] w-full bg-black flex items-center justify-center relative select-none"
                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
               >
-                <video
-                  src={activePreviewReel.video_url.endsWith('.m3u8') 
-                    ? activePreviewReel.video_url.replace('.m3u8', '/video.mp4') 
-                    : activePreviewReel.video_url}
-                  controls
-                  controlsList="nodownload noplaybackrate nofullscreen"
-                  disablePictureInPicture
-                  autoPlay
-                  playsInline
-                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  className="w-full h-full object-contain"
+                <ReelsPlayer
+                  id="preview"
+                  url={activePreviewReel.video_url}
+                  poster={activePreviewReel.thumbnail_url}
+                  title={activePreviewReel.title}
+                  isActive={true}
+                  isMuted={false}
+                  onToggleMute={() => {}}
                 />
               </div>
 
