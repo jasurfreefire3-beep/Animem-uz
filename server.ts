@@ -18,6 +18,15 @@ import webpush from "web-push";
 
 dotenv.config();
 
+// Global crash protection for production container reliability
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[Process Safe] Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[Process Safe] Uncaught Exception thrown:", err);
+});
+
 // Setup VAPID keys for Web Push Notifications (Works even when user is offline / site is closed)
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "BNo_Gg_l4U1Gj1c-E7B68Y52p7dO64lXvC4L91x5NlB1qGgJ7fK1lZlU9sX4_y9zL2pX2s9k-M6Z3q1j5a4g6gE";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "K7mQ6lX_3s9k4p1j8a2g5dE6bL1qZlU9sX4y2z0pX1c";
