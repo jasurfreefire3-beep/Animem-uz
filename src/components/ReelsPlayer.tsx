@@ -26,21 +26,22 @@ export default function ReelsPlayer({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [hasError, setHasError] = useState<boolean>(false);
   const [showPlayIcon, setShowPlayIcon] = useState<boolean>(false);
   const [showHeartAnim, setShowHeartAnim] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(0);
   const lastTapTimeRef = useRef<number>(0);
 
-  // Initialize HLS or standard video source
+  // Initialize video source reliably
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     let hls: Hls | null = null;
     setIsLoading(true);
+    setHasError(false);
 
-    const isHlsUrl = url.endsWith('.m3u8') || url.includes('/hls/');
+    const isHlsUrl = url && (url.endsWith('.m3u8') || url.includes('/hls/'));
 
     if (isHlsUrl && Hls.isSupported()) {
       hls = new Hls({
@@ -52,7 +53,7 @@ export default function ReelsPlayer({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
         if (isActive) {
-          video.play().then(() => setIsPlaying(true)).catch(() => {});
+          video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
         }
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -65,19 +66,35 @@ export default function ReelsPlayer({
               hls?.recoverMediaError();
               break;
             default:
+              // Fallback to direct src if HLS fails
               hls?.destroy();
+              video.src = url;
+              video.load();
               break;
           }
         }
       });
     } else {
-      // Native video source (MP4 / /api/video/:id)
+      // Direct source (MP4 / /api/video/:id / blob)
       video.src = url;
       video.load();
-      setIsLoading(false);
-      if (isActive) {
-        video.play().then(() => setIsPlaying(true)).catch(() => {});
-      }
+      const handleCanPlay = () => {
+        setIsLoading(false);
+        if (isActive) {
+          video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        }
+      };
+      video.addEventListener('canplay', handleCanPlay, { once: true });
+      
+      // Fallback timeout in case canplay doesn't fire
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 1500);
+
+      return () => {
+        video.removeEventListener('canplay', handleCanPlay);
+        clearTimeout(timer);
+      };
     }
 
     return () => {
@@ -86,7 +103,8 @@ export default function ReelsPlayer({
       }
       if (video) {
         video.pause();
-        video.src = '';
+        video.removeAttribute('src');
+        video.load();
       }
     };
   }, [url]);
@@ -98,12 +116,15 @@ export default function ReelsPlayer({
 
     if (isActive) {
       video.currentTime = 0;
-      video.play().then(() => {
-        setIsPlaying(true);
-      }).catch((err) => {
-        console.warn("Autoplay blocked or failed:", err);
-        setIsPlaying(false);
-      });
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setIsPlaying(true))
+          .catch((err) => {
+            console.warn("Autoplay prevented:", err);
+            setIsPlaying(false);
+          });
+      }
     } else {
       video.pause();
       setIsPlaying(false);
@@ -124,7 +145,6 @@ export default function ReelsPlayer({
     const current = video.currentTime;
     const dur = video.duration || 1;
     setProgress((current / dur) * 100);
-    setDuration(dur);
   };
 
   const handleVideoEnded = () => {
@@ -136,7 +156,6 @@ export default function ReelsPlayer({
 
   const handleTapOrClick = () => {
     const now = Date.now();
-    // Double tap detector (300ms)
     if (now - lastTapTimeRef.current < 300) {
       if (onDoubleTapLike) {
         onDoubleTapLike();
@@ -148,7 +167,6 @@ export default function ReelsPlayer({
     }
     lastTapTimeRef.current = now;
 
-    // Single tap -> toggle play / pause
     const video = videoRef.current;
     if (!video) return;
 
