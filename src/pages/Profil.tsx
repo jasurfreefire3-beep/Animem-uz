@@ -6,7 +6,7 @@ import {
   Shield, Clock, Heart, MessageSquare, Edit3, Save, Camera, 
   Loader2, Globe, Send, Instagram, Youtube, Tv, Share2, 
   Check, X, Sparkles, Film, Star, ArrowRight, Lock, Eye, Trash2,
-  RotateCcw, LogIn
+  RotateCcw, LogIn, Play, Upload, AlertCircle, Link as LinkIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -75,6 +75,19 @@ export default function Profil() {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  // User-Uploaded Reels State
+  const [userReels, setUserReels] = useState<any[]>([]);
+  const [loadingReels, setLoadingReels] = useState(false);
+  const [showAddReelModal, setShowAddReelModal] = useState(false);
+  const [reelTitle, setReelTitle] = useState('');
+  const [reelAnimeTitle, setReelAnimeTitle] = useState('');
+  const [reelVideoUrl, setReelVideoUrl] = useState('');
+  const [reelThumbnailUrl, setReelThumbnailUrl] = useState('');
+  const [reelTags, setReelTags] = useState('');
+  const [uploadingReel, setUploadingReel] = useState(false);
+  const [reelUploadError, setReelUploadError] = useState('');
+  const [activePreviewReel, setActivePreviewReel] = useState<any | null>(null);
 
   // Format watch time accurately into hours and minutes in Uzbek
   const formatWatchTime = (minutes?: number) => {
@@ -187,6 +200,9 @@ export default function Profil() {
         setEditFacebook(data.user.facebook || '');
         setEditVk(data.user.vk || '');
         setLoading(false);
+
+        // Fetch user uploaded reels from MySQL
+        fetchUserReels(data.user.id);
         return; // Success
       } catch (err: any) {
         retries--;
@@ -204,6 +220,133 @@ export default function Profil() {
           delay *= 1.5;
         }
       }
+    }
+  };
+
+  const fetchUserReels = async (userId: string | number) => {
+    setLoadingReels(true);
+    try {
+      const res = await fetch(`/api/user/${userId}/reels`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setUserReels(data);
+      }
+    } catch (e) {
+      console.warn("User reels fetch error:", e);
+    } finally {
+      setLoadingReels(false);
+    }
+  };
+
+  const handleUploadReelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!token) {
+      setReelUploadError("Avval tizimga kiring!");
+      return;
+    }
+
+    const isAdmin = currentUser?.role === 'admin';
+    const MAX_USER_SIZE = 15 * 1024 * 1024; // 15 MB
+    if (!isAdmin && file.size > MAX_USER_SIZE) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      setReelUploadError(`Oddiy foydalanuvchilar uchun maksimal video hajmi 15 MB. Siz tanlagan fayl hajmi: ${sizeMB} MB. Iltimos 15 MB dan kichik video tanlang!`);
+      return;
+    }
+
+    setUploadingReel(true);
+    setReelUploadError('');
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/reels/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      });
+      const data = await res.json();
+      if (data?.url) {
+        setReelVideoUrl(data.url);
+      } else {
+        setReelUploadError(data.error || "Video yuklashda xatolik yuz berdi");
+      }
+    } catch (err: any) {
+      setReelUploadError(err?.message || "Video yuklashda xatolik yuz berdi");
+    } finally {
+      setUploadingReel(false);
+    }
+  };
+
+  const handleCreateUserReel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reelVideoUrl.trim()) {
+      setReelUploadError("Video faylini tanlang yoki URL kiriting!");
+      return;
+    }
+
+    if (!token) {
+      setReelUploadError("Avval tizimga kiring!");
+      return;
+    }
+
+    setUploadingReel(true);
+    setReelUploadError('');
+
+    try {
+      const res = await fetch('/api/reels', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: reelTitle || "Anime Reel",
+          anime_title: reelAnimeTitle || "Anime",
+          video_url: reelVideoUrl,
+          thumbnail_url: reelThumbnailUrl,
+          tags: reelTags
+        })
+      });
+      const data = await res.json();
+      if (data?.success && data?.reel) {
+        setUserReels(prev => [data.reel, ...prev]);
+        setShowAddReelModal(false);
+        setReelTitle('');
+        setReelAnimeTitle('');
+        setReelVideoUrl('');
+        setReelThumbnailUrl('');
+        setReelTags('');
+      } else {
+        setReelUploadError(data.error || "Reel yaratishda xatolik");
+      }
+    } catch (err: any) {
+      setReelUploadError(err?.message || "Reel yaratishda xatolik");
+    } finally {
+      setUploadingReel(false);
+    }
+  };
+
+  const handleDeleteUserReel = async (reelId: number | string) => {
+    if (!window.confirm("Haqiqatdan ham ushbu videoni o'chirmoqchimisiz?")) return;
+    try {
+      const res = await fetch(`/api/reels/${reelId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setUserReels(prev => prev.filter(r => String(r.id) !== String(reelId)));
+      } else {
+        alert(data.error || "O'chirishda xatolik yuz berdi");
+      }
+    } catch (err: any) {
+      alert(err?.message || "O'chirishda xatolik");
     }
   };
 
@@ -623,14 +766,20 @@ export default function Profil() {
 
           </div>
 
-          {/* Edit Action Button */}
+          {/* Edit & Add Reel Action Buttons */}
           {isOwner && (
-            <div className="shrink-0">
+            <div className="shrink-0 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setShowAddReelModal(true)}
+                className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold text-xs px-4 py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(236,72,153,0.35)] flex items-center gap-2 uppercase tracking-wider cursor-pointer active:scale-95 border border-pink-400/30"
+              >
+                <Film size={14} /> Reel Qo'shish
+              </button>
               <button
                 onClick={() => setIsEditing(!isEditing)}
-                className="bg-[#ff006a] hover:bg-[#d40058] text-white font-bold text-xs px-5 py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(255,0,106,0.25)] flex items-center gap-2 uppercase tracking-wider cursor-pointer"
+                className="bg-[#ff006a] hover:bg-[#d40058] text-white font-bold text-xs px-4 py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(255,0,106,0.25)] flex items-center gap-2 uppercase tracking-wider cursor-pointer"
               >
-                <Edit3 size={14} /> Profilni Tahrirlash
+                <Edit3 size={14} /> Tahrirlash
               </button>
             </div>
           )}
@@ -959,6 +1108,349 @@ export default function Profil() {
           </div>
         )}
       </div>
+
+      {/* USER-UPLOADED REELS SECTION */}
+      <div className="bg-[#111] border border-[#222] rounded-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-[#222] pb-4 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Film size={18} className="text-pink-500" />
+            <h3 className="text-base font-bold text-white uppercase tracking-wider">
+              Yuklangan Reels Videolar ({userReels.length})
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link 
+              to="/reels" 
+              className="text-xs text-pink-400 hover:text-pink-300 font-bold flex items-center gap-1 hover:underline"
+            >
+              Reels bo'limiga o'tish <ArrowRight size={13} />
+            </Link>
+
+            {isOwner && (
+              <button
+                onClick={() => setShowAddReelModal(true)}
+                className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Upload size={13} /> Video yuklash
+              </button>
+            )}
+          </div>
+        </div>
+
+        {loadingReels ? (
+          <div className="text-center py-12 text-white/40 space-y-2">
+            <Loader2 className="w-8 h-8 mx-auto animate-spin text-pink-500" />
+            <p className="text-xs font-mono">Reelslar yuklanmoqda...</p>
+          </div>
+        ) : userReels.length === 0 ? (
+          <div className="text-center py-12 text-white/30 space-y-3">
+            <Film className="w-12 h-12 mx-auto text-white/20" />
+            <p className="text-xs font-mono">
+              {isOwner 
+                ? "Siz hali birorta ham reel yuklamagansiz. Yuqoridagi 'Video yuklash' tugmasi orqali ilk videongizni qo'shing!" 
+                : "Ushbu foydalanuvchi hali birorta ham reel yuklamagan."}
+            </p>
+            {isOwner && (
+              <button
+                onClick={() => setShowAddReelModal(true)}
+                className="inline-block bg-pink-600/20 hover:bg-pink-600 text-pink-300 hover:text-white border border-pink-500/30 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              >
+                + Ilk Reel videoni yuklash (15 MB gacha)
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {userReels.map((reel) => (
+              <div 
+                key={reel.id} 
+                className="bg-[#161618] border border-[#222] rounded-xl overflow-hidden group hover:border-pink-500/50 transition-all flex flex-col relative shadow-lg"
+              >
+                {/* Reel Video Card (Vertical 9:16 Aspect) */}
+                <div 
+                  onClick={() => setActivePreviewReel(reel)}
+                  className="aspect-[9/16] relative overflow-hidden rounded-t-xl bg-black cursor-pointer"
+                >
+                  {reel.thumbnail_url ? (
+                    <img 
+                      loading="lazy" 
+                      src={reel.thumbnail_url} 
+                      alt={reel.title} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <video 
+                      src={reel.video_url} 
+                      className="w-full h-full object-cover pointer-events-none opacity-80" 
+                      muted 
+                      preload="metadata"
+                    />
+                  )}
+
+                  {/* Play Overlay */}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-10 h-10 rounded-full bg-pink-600/90 text-white flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+                      <Play size={18} className="fill-current ml-0.5" />
+                    </div>
+                  </div>
+
+                  {/* Likes and Views counter overlay */}
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[11px] text-white font-medium drop-shadow-md pointer-events-none">
+                    <span className="flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
+                      <Heart size={10} className="fill-pink-500 text-pink-500" /> {reel.likes_count || 0}
+                    </span>
+                    <span className="flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
+                      <Eye size={10} /> {reel.views_count || 0}
+                    </span>
+                  </div>
+
+                  {/* Delete button for Owner or Admin */}
+                  {(isOwner || currentUser?.role === 'admin') && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteUserReel(reel.id);
+                      }}
+                      title="Reelni o'chirish"
+                      className="absolute top-2 right-2 bg-black/80 hover:bg-red-600 text-white/80 hover:text-white p-1.5 rounded-lg border border-white/10 backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 z-10 cursor-pointer"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Reel Info */}
+                <div className="p-2.5 flex flex-col flex-1 justify-between bg-[#111]">
+                  <p 
+                    onClick={() => setActivePreviewReel(reel)}
+                    className="text-xs font-semibold text-white group-hover:text-pink-400 transition-colors line-clamp-2 cursor-pointer"
+                  >
+                    {reel.title}
+                  </p>
+                  {reel.anime_title && (
+                    <span className="text-[10px] text-white/40 mt-1 truncate block">
+                      {reel.anime_title}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ADD REEL MODAL (Responsive Mobile/Desktop) */}
+      <AnimatePresence>
+        {showAddReelModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-lg bg-[#16161d] border border-white/10 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center space-x-2">
+                  <Film className="w-5 h-5 text-pink-500" />
+                  <h3 className="font-bold text-white text-base sm:text-lg">Reelsga Video Joylash</h3>
+                </div>
+                <button
+                  onClick={() => setShowAddReelModal(false)}
+                  className="p-1 rounded-full text-white/60 hover:text-white hover:bg-white/10 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {reelUploadError && (
+                <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-200 text-xs flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{reelUploadError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleCreateUserReel} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-white/70 mb-1">
+                    Reel Sarlavhasi *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Masalan: Naruto eng kuchli hujumi! 🔥"
+                    value={reelTitle}
+                    onChange={(e) => setReelTitle(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-white/70 mb-1">
+                    Anime Nomi
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Masalan: Naruto Shippuden"
+                    value={reelAnimeTitle}
+                    onChange={(e) => setReelAnimeTitle(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+
+                {/* Device Video File Upload */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-white/70">
+                      Video fayli (Qurilmadan to'g'ridan-to'g'ri MySQL ga yuklanadi) *
+                    </label>
+                    <span className="text-[10px] text-pink-400 font-medium">
+                      {currentUser?.role === 'admin' ? "Admin: Cheksiz hajm" : "Maksimal: 15 MB"}
+                    </span>
+                  </div>
+                  <label className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-pink-500/40 hover:border-pink-500 bg-pink-500/5 cursor-pointer transition-colors text-pink-300 text-xs text-center space-y-1">
+                    <Upload className="w-5 h-5 mx-auto text-pink-400" />
+                    <span className="font-semibold">
+                      {uploadingReel ? "MySQL bazasiga yuklanmoqda..." : "Videoni tanlash (MP4/WebM)"}
+                    </span>
+                    <span className="text-[10px] text-white/40">
+                      {currentUser?.role === 'admin' 
+                        ? "Adminlar uchun cheklovsiz video hajmi" 
+                        : "Oddiy foydalanuvchilar uchun 15 MB gacha"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm"
+                      className="hidden"
+                      onChange={handleUploadReelFile}
+                      disabled={uploadingReel}
+                    />
+                  </label>
+
+                  {reelVideoUrl && (
+                    <div className="mt-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs truncate flex items-center gap-1.5">
+                      <Check size={14} /> Video tayyor: {reelVideoUrl}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-white/70 mb-1">
+                    Yoki Video URL (m3u8 yoki mp4 havola)
+                  </label>
+                  <div className="flex items-center space-x-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                    <LinkIcon className="w-4 h-4 text-white/40 shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="https://... yoki /api/reels/stream/..."
+                      value={reelVideoUrl}
+                      onChange={(e) => setReelVideoUrl(e.target.value)}
+                      className="w-full bg-transparent text-xs text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-white/70 mb-1">
+                    Muqova (Poster / Thumbnail) Rasm URL (Ixtiyoriy)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={reelThumbnailUrl}
+                    onChange={(e) => setReelThumbnailUrl(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-white/70 mb-1">
+                    Teglar (Hashtaglar)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="#anime #naruto #uzb"
+                    value={reelTags}
+                    onChange={(e) => setReelTags(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddReelModal(false)}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    Bekor qilish
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={uploadingReel || !reelVideoUrl}
+                    className="px-5 py-2 bg-pink-600 hover:bg-pink-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg cursor-pointer"
+                  >
+                    {uploadingReel ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    <span>Joylash</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* REEL PREVIEW MODAL */}
+      <AnimatePresence>
+        {activePreviewReel && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm bg-black rounded-2xl overflow-hidden border border-white/20 shadow-2xl flex flex-col"
+            >
+              <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-auto">
+                <span className="bg-black/60 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-full border border-white/10">
+                  {activePreviewReel.anime_title || 'Anime Reel'}
+                </span>
+                <button
+                  onClick={() => setActivePreviewReel(null)}
+                  className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/20 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Video Player */}
+              <div className="aspect-[9/16] w-full bg-black flex items-center justify-center relative">
+                <video
+                  src={activePreviewReel.video_url.endsWith('.m3u8') 
+                    ? activePreviewReel.video_url.replace('.m3u8', '/video.mp4') 
+                    : activePreviewReel.video_url}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              </div>
+
+              {/* Bottom Info Bar */}
+              <div className="p-4 bg-[#141417] border-t border-white/10 flex items-center justify-between">
+                <div className="min-w-0 flex-1 pr-2">
+                  <h4 className="text-white text-sm font-bold truncate">{activePreviewReel.title}</h4>
+                  <p className="text-white/50 text-[11px] truncate">Muallif: @{activePreviewReel.author_name || 'Animem.uz'}</p>
+                </div>
+                <Link
+                  to="/reels"
+                  className="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-lg shrink-0"
+                >
+                  Reelsda ko'rish
+                </Link>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ACCOUNT DETAILS & PRIVACY CARD */}
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 space-y-4">

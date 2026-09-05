@@ -51,6 +51,11 @@ export default function MobileBottomNav() {
 
   const rawPath = location.pathname.replace(/^\/(uz|ru|ing|en)(\/|$)/, '/');
 
+  // Reels bo'limiga kirilganda mobil qurilmalarda pastki menyularni butunlay yashirish
+  if (rawPath.startsWith('/reels') || location.pathname.includes('/reels')) {
+    return null;
+  }
+
   const navItems = [
     {
       id: 'home',

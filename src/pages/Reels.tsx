@@ -12,7 +12,8 @@ import {
   AlertCircle,
   X,
   Upload,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Trash2
 } from 'lucide-react';
 import ReelsPlayer from '../components/ReelsPlayer';
 import ReelsCommentsModal from '../components/ReelsCommentsModal';
@@ -196,13 +197,45 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
     }
   };
 
+  const handleDeleteReel = async (reelId: number | string) => {
+    if (!window.confirm("Rostdan ham ushbu videoni o'chirmoqchimisiz?")) return;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/api/reels/${reelId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setReels((prev) => prev.filter((r) => String(r.id) !== String(reelId)));
+        if (activeIndex >= reels.length - 1) {
+          setActiveIndex(Math.max(0, reels.length - 2));
+        }
+      } else {
+        alert(data?.error || "O'chirishda xatolik yuz berdi");
+      }
+    } catch (err: any) {
+      alert(err?.message || "O'chirishda xatolik");
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const token = localStorage.getItem('token');
     if (!token) {
-      setAddError("Avval admin akkauntiga kiring");
+      setAddError("Reel yuklash uchun avval tizimga kiring!");
+      return;
+    }
+
+    const isAdmin = currentUser?.role === 'admin';
+    const MAX_USER_SIZE = 15 * 1024 * 1024; // 15 MB
+    if (!isAdmin && file.size > MAX_USER_SIZE) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      setAddError(`Oddiy foydalanuvchilar uchun maksimal video hajmi 15 MB. Siz tanlagan fayl hajmi: ${sizeMB} MB. Iltimos 15 MB dan kichik video tanlang!`);
       return;
     }
 
@@ -306,21 +339,22 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
         <div className="flex items-center space-x-2 bg-black/40 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 pointer-events-auto shadow-lg">
           <Sparkles className="w-4 h-4 text-pink-400" />
           <span className="text-sm font-bold tracking-wider text-white">REELS</span>
-          <span className="text-xs bg-pink-500/30 text-pink-300 font-semibold px-2 py-0.5 rounded-full">
-            {activeIndex + 1}/{reels.length}
-          </span>
         </div>
 
-        {/* Admin Add Reel button */}
-        {currentUser?.role === 'admin' && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center space-x-1.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg pointer-events-auto transition-all active:scale-95 border border-pink-400/30"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Reel qo'shish</span>
-          </button>
-        )}
+        {/* User / Admin Add Reel button */}
+        <button
+          onClick={() => {
+            if (!currentUser) {
+              alert("Reel qo'shish uchun avval profilingizga kiring!");
+              return;
+            }
+            setShowAddModal(true);
+          }}
+          className="flex items-center space-x-1.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg pointer-events-auto transition-all active:scale-95 border border-pink-400/30 cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Reel qo'shish</span>
+        </button>
       </div>
 
       {/* Desktop Up / Down Controls */}
@@ -434,6 +468,23 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                     {formatCount(reel.shares_count)}
                   </span>
                 </button>
+
+                {/* Delete Button (Only for reel owner or admin) */}
+                {(currentUser?.role === 'admin' || (currentUser?.id && Number(reel.user_id) === Number(currentUser.id))) && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteReel(reel.id)}
+                    title="Reelni o'chirish"
+                    className="flex flex-col items-center space-y-1 text-red-400 hover:text-red-300 group active:scale-90 transition-transform"
+                  >
+                    <div className="p-3 rounded-full bg-red-600/30 hover:bg-red-600/50 backdrop-blur-md border border-red-500/30 transition-colors">
+                      <Trash2 className="w-6 h-6 text-red-300" />
+                    </div>
+                    <span className="text-[10px] font-semibold drop-shadow-md text-red-200">
+                      O'chirish
+                    </span>
+                  </button>
+                )}
               </div>
 
               {/* Bottom Metadata Overlay (Instagram Style) */}
@@ -566,13 +617,18 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
 
               {/* Video upload from device or URL */}
               <div>
-                <label className="block text-xs font-semibold text-white/70 mb-1">
-                  Video fayli (Qurilmadan to'g'ridan-to'g'ri MySQL ga yuklash)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-white/70">
+                    Video fayli (Qurilmadan to'g'ridan-to'g'ri MySQL ga)
+                  </label>
+                  <span className="text-[10px] text-pink-400 font-medium">
+                    {currentUser?.role === 'admin' ? "Admin: Hajm cheklovsiz" : "Maksimal: 15 MB"}
+                  </span>
+                </div>
                 <div className="flex items-center space-x-2">
-                  <label className="flex-1 flex items-center justify-center space-x-2 px-3.5 py-2 rounded-xl border border-dashed border-pink-500/50 hover:border-pink-500 bg-pink-500/10 cursor-pointer transition-colors text-pink-300 text-xs font-medium">
+                  <label className="flex-1 flex items-center justify-center space-x-2 px-3.5 py-2.5 rounded-xl border border-dashed border-pink-500/50 hover:border-pink-500 bg-pink-500/10 cursor-pointer transition-colors text-pink-300 text-xs font-medium">
                     <Upload className="w-4 h-4" />
-                    <span>{isUploading ? "Yuklanmoqda..." : "Videoni tanlang (MP4/WebM)"}</span>
+                    <span>{isUploading ? "MySQL ga yuklanmoqda..." : "Videoni tanlang (MP4/WebM)"}</span>
                     <input
                       type="file"
                       accept="video/mp4,video/webm"
@@ -582,6 +638,11 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                     />
                   </label>
                 </div>
+                {newVideoUrl && (
+                  <p className="text-[11px] text-emerald-400 mt-1 truncate">
+                    ✓ Video saqlandi: {newVideoUrl}
+                  </p>
+                )}
               </div>
 
               <div>

@@ -79,10 +79,17 @@ app.use("/__", (req, res) => {
   req.pipe(proxyReq, { end: true });
 });
 
+// Instant Northflank & Kubernetes Health Check Probes (<1ms response, no overhead)
+app.get(["/health", "/api/health", "/ping"], (_req, res) => {
+  res.status(200).send("OK");
+});
+
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
+  if (req.url.startsWith("/api") || req.url.startsWith("/auth")) {
+    console.log(`${req.method} ${req.url}`);
+  }
   next();
 });
 
@@ -123,7 +130,7 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || "pw_7GNRdocASAIUzobl5Ezatle9fwRC3oYq",
   database: process.env.DB_NAME || "dataanime",
   waitForConnections: true,
-  connectionLimit: 15,
+  connectionLimit: 8,
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
@@ -338,8 +345,9 @@ const authenticateToken = (req: any, res: any, next: any) => {
 
 // Check and ensure database connection on start
 async function testDbConnection() {
+  let connection: any = null;
   try {
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
     console.log("Connected to MySQL database successfully!");
     
     // Create notifications table if not exists
@@ -835,6 +843,10 @@ async function testDbConnection() {
         ) ENGINE=InnoDB
       `);
 
+      try {
+        await connection.query(`ALTER TABLE reels ADD COLUMN user_id INT DEFAULT NULL`);
+      } catch (e) {}
+
       console.log("Verified reels, reel_comments, and reel_likes tables in MySQL.");
 
       // Check if reels need initial seeding
@@ -960,10 +972,14 @@ async function testDbConnection() {
     }
 
     console.log("Verified mangas, manga_chapters, comments, media_files, messages and reels tables and columns in MySQL.");
-
-    connection.release();
   } catch (err) {
     console.error("Database connection/migration failed on startup:", err);
+  } finally {
+    if (connection) {
+      try {
+        connection.release();
+      } catch (_) {}
+    }
   }
 }
 testDbConnection();
@@ -2980,21 +2996,29 @@ function getClientIdentifier(req: any): { userId: number | null, identifier: str
   return { userId, identifier };
 }
 
-// 1. Get all Reels
+// 1. Get all Reels (Supports filtering by ?user_id=...)
 app.get("/api/reels", async (req: any, res: any) => {
   res.setHeader("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
   const { userId, identifier } = getClientIdentifier(req);
+  const targetUserId = req.query.user_id ? Number(req.query.user_id) : null;
 
   try {
-    const [rows]: any = await dbQuery(`
+    let sql = `
       SELECT r.*,
         (SELECT COUNT(*) FROM reel_comments WHERE reel_id = r.id) as comments_count,
         EXISTS(SELECT 1 FROM reel_likes WHERE reel_id = r.id AND user_identifier = ?) as is_liked
       FROM reels r
-      ORDER BY r.id DESC
-    `, [identifier]);
+    `;
+    const params: any[] = [identifier];
+    if (targetUserId && !isNaN(targetUserId)) {
+      sql += ` WHERE r.user_id = ? `;
+      params.push(targetUserId);
+    }
+    sql += ` ORDER BY r.id DESC`;
 
-    if (Array.isArray(rows) && rows.length > 0) {
+    const [rows]: any = await dbQuery(sql, params);
+
+    if (Array.isArray(rows)) {
       const formatted = rows.map((row: any) => ({
         ...row,
         is_liked: Boolean(row.is_liked),
@@ -3008,7 +3032,10 @@ app.get("/api/reels", async (req: any, res: any) => {
 
   // Fallback to local store or static reels
   const store = loadLocalStore();
-  const reels = (store.reels && store.reels.length > 0) ? store.reels : STATIC_FALLBACK_REELS;
+  let reels = (store.reels && store.reels.length > 0) ? store.reels : STATIC_FALLBACK_REELS;
+  if (targetUserId && !isNaN(targetUserId)) {
+    reels = reels.filter((r: any) => Number(r.user_id) === targetUserId);
+  }
   return res.json(reels);
 });
 
@@ -3235,13 +3262,9 @@ app.post("/api/reels/:id/view", async (req: any, res: any) => {
   }
 });
 
-// 8. Create new Reel (Admin only)
+// 8. Create new Reel (Any authenticated user can post from profile or reels page)
 app.post("/api/reels", authenticateToken, async (req: any, res: any) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Faqat admin yangi reel qo'sha oladi" });
-    }
-
     const { title, anime_title, video_url, thumbnail_url, tags } = req.body;
     if (!video_url || !video_url.trim()) {
       return res.status(400).json({ error: "Video URL kiritilishi shart" });
@@ -3253,12 +3276,16 @@ app.post("/api/reels", authenticateToken, async (req: any, res: any) => {
     const trimmedThumb = (thumbnail_url || "").trim() || "https://files.catbox.moe/45hoi6.png";
     const reelTags = (tags || "").trim() || "#anime #reels #animemuz";
 
+    const currentUserId = req.user?.id ? Number(req.user.id) : null;
+    const authorName = req.user?.name || (req.user?.role === "admin" ? "Animem.uz" : "Foydalanuvchi");
+    const authorAvatar = req.user?.avatar_url || "https://files.catbox.moe/45hoi6.png";
+
     let insertedId = Date.now();
     try {
       const [result]: any = await dbQuery(
-        `INSERT INTO reels (title, anime_title, video_url, thumbnail_url, author_name, author_avatar, likes_count, views_count, shares_count, tags)
-         VALUES (?, ?, ?, ?, 'Animem.uz', 'https://files.catbox.moe/45hoi6.png', 0, 0, 0, ?)`,
-        [reelTitle, animeName, trimmedVideo, trimmedThumb, reelTags]
+        `INSERT INTO reels (title, anime_title, video_url, thumbnail_url, author_name, author_avatar, likes_count, views_count, shares_count, tags, user_id)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?)`,
+        [reelTitle, animeName, trimmedVideo, trimmedThumb, authorName, authorAvatar, reelTags, currentUserId]
       );
       if (result?.insertId) insertedId = result.insertId;
     } catch (dbErr: any) {
@@ -3271,13 +3298,14 @@ app.post("/api/reels", authenticateToken, async (req: any, res: any) => {
       anime_title: animeName,
       video_url: trimmedVideo,
       thumbnail_url: trimmedThumb,
-      author_name: "Animem.uz",
-      author_avatar: "https://files.catbox.moe/45hoi6.png",
+      author_name: authorName,
+      author_avatar: authorAvatar,
       likes_count: 0,
       views_count: 0,
       shares_count: 0,
       comments_count: 0,
       tags: reelTags,
+      user_id: currentUserId,
       is_liked: false,
       created_at: new Date()
     };
@@ -3297,15 +3325,22 @@ app.post("/api/reels", authenticateToken, async (req: any, res: any) => {
   }
 });
 
-// 9. Delete Reel (Admin only)
+// 9. Delete Reel (Admin or the user who uploaded it)
 app.delete("/api/reels/:id", authenticateToken, async (req: any, res: any) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Faqat admin o'chira oladi" });
-    }
-
     const reelId = req.params.id;
     if (!reelId) return res.status(400).json({ error: "Reel ID kiritilmadi" });
+
+    // Check ownership
+    try {
+      const [existing]: any = await dbQuery("SELECT user_id FROM reels WHERE id = ?", [reelId]);
+      if (existing && existing.length > 0) {
+        const ownerId = existing[0].user_id;
+        if (req.user.role !== "admin" && String(ownerId) !== String(req.user.id)) {
+          return res.status(403).json({ error: "Siz faqat o'zingiz yuklagan videolarni o'chira olasiz!" });
+        }
+      }
+    } catch (checkErr) {}
 
     try {
       await dbQuery("DELETE FROM reel_comments WHERE reel_id = ?", [reelId]);
@@ -3328,21 +3363,27 @@ app.delete("/api/reels/:id", authenticateToken, async (req: any, res: any) => {
   }
 });
 
-// 10. Upload Reel Video directly to MySQL media_files (Admin only)
+// 10. Upload Reel Video directly to MySQL media_files (Admin unlimited, regular users max 15MB)
 app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (req: any, res: any) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Faqat admin video yuklay oladi" });
-    }
-
     if (!req.file) {
       return res.status(400).json({ error: "Video fayl tanlanmagan" });
+    }
+
+    const fileSize = req.file.size;
+    const isAdmin = req.user?.role === "admin";
+    const maxUserSize = 15 * 1024 * 1024; // 15 MB
+
+    if (!isAdmin && fileSize > maxUserSize) {
+      const currentMB = (fileSize / (1024 * 1024)).toFixed(1);
+      return res.status(400).json({ 
+        error: `Oddiy foydalanuvchilar uchun maksimal video hajmi 15 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 15 MB dan kichik video yuklang yoki admin bilan bog'laning!` 
+      });
     }
 
     const fileBuffer = req.file.buffer;
     const filename = req.file.originalname || "reel.mp4";
     const mimeType = req.file.mimetype || "video/mp4";
-    const fileSize = req.file.size;
     const base64String = fileBuffer.toString("base64");
     const mediaId = "reel_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
 
@@ -3355,18 +3396,125 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
       console.warn("media_files reel insert warning:", e?.message || e);
     }
 
-    // Cache in RAM
+    // Cache in RAM for instant first playback
     mediaMemoryCache.set(mediaId, { mimeType, base64: base64String, buffer: fileBuffer });
-    const mediaUrl = `/api/media/${mediaId}`;
+    
+    // M3U8 HLS streaming playlist URL
+    const m3u8Url = `/api/reels/stream/${mediaId}.m3u8`;
 
     return res.status(201).json({
       success: true,
-      url: mediaUrl,
+      url: m3u8Url,
+      direct_url: `/api/media/${mediaId}`,
       media_id: mediaId
     });
   } catch (err: any) {
     console.error("Upload reel video error:", err);
     return res.status(500).json({ error: "Video faylni yuklashda xatolik yuz berdi" });
+  }
+});
+
+// 11. HLS M3U8 Playlist generator for Reel videos stored in MySQL
+app.get("/api/reels/stream/:id.m3u8", async (req: any, res: any) => {
+  const mediaId = req.params.id;
+  res.setHeader("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+  const m3u8Content = [
+    "#EXTM3U",
+    "#EXT-X-VERSION:3",
+    "#EXT-X-TARGETDURATION:120",
+    "#EXT-X-MEDIA-SEQUENCE:0",
+    "#EXTINF:120.0,",
+    `/api/reels/stream/${mediaId}/video.mp4`,
+    "#EXT-X-ENDLIST"
+  ].join("\n");
+
+  return res.send(m3u8Content);
+});
+
+// 12. HLS Video segment & stream from MySQL with HTTP 206 Partial Content (Range) support
+app.get(["/api/reels/stream/:id/video.mp4", "/api/reels/stream/:id/segment.ts"], async (req: any, res: any) => {
+  try {
+    const mediaId = req.params.id;
+    if (!mediaId) return res.status(400).send("Media ID topilmadi");
+
+    let mimeType = "video/mp4";
+    let buffer: Buffer | null = null;
+
+    if (mediaMemoryCache.has(mediaId)) {
+      const cached = mediaMemoryCache.get(mediaId)!;
+      mimeType = cached.mimeType || "video/mp4";
+      buffer = cached.buffer || Buffer.from(cached.base64, "base64");
+    } else {
+      const [rows]: any = await dbQuery("SELECT mime_type, data FROM media_files WHERE id = ?", [mediaId]);
+      if (!rows || rows.length === 0) {
+        return res.status(404).send("Video MySQL bazasida topilmadi");
+      }
+      mimeType = rows[0].mime_type || "video/mp4";
+      buffer = Buffer.from(rows[0].data, "base64");
+      mediaMemoryCache.set(mediaId, { mimeType, base64: rows[0].data, buffer });
+      if (mediaMemoryCache.size > 200) {
+        const first = mediaMemoryCache.keys().next().value;
+        if (first) mediaMemoryCache.delete(first);
+      }
+    }
+
+    if (!buffer) return res.status(404).send("Video fayl mavjud emas");
+
+    const totalSize = buffer.length;
+    const range = req.headers.range;
+
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+      const chunksize = end - start + 1;
+
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${totalSize}`);
+      res.setHeader("Content-Length", chunksize);
+      return res.send(buffer.subarray(start, end + 1));
+    } else {
+      res.setHeader("Content-Length", totalSize);
+      return res.send(buffer);
+    }
+  } catch (err: any) {
+    console.error("Stream reel video error:", err);
+    return res.status(500).send("Video oqimida xatolik");
+  }
+});
+
+// 13. Get user specific reels
+app.get("/api/user/:id/reels", async (req: any, res: any) => {
+  try {
+    const targetUserId = req.params.id;
+    const { identifier } = getClientIdentifier(req);
+
+    const [rows]: any = await dbQuery(`
+      SELECT r.*,
+        (SELECT COUNT(*) FROM reel_comments WHERE reel_id = r.id) as comments_count,
+        EXISTS(SELECT 1 FROM reel_likes WHERE reel_id = r.id AND user_identifier = ?) as is_liked
+      FROM reels r
+      WHERE r.user_id = ?
+      ORDER BY r.id DESC
+    `, [identifier, targetUserId]);
+
+    const formatted = (rows || []).map((row: any) => ({
+      ...row,
+      is_liked: Boolean(row.is_liked),
+      comments_count: Number(row.comments_count || 0)
+    }));
+
+    return res.json(formatted);
+  } catch (err: any) {
+    console.error("Get user reels error:", err);
+    return res.json([]);
   }
 });
 
@@ -8417,18 +8565,14 @@ async function start() {
 
   // In-memory cache for index.html
   let cachedIndexHtml: string | null = null;
-  let cachedIndexMtime = 0;
 
   const getCachedIndexHtml = (indexPath: string): string => {
+    if (cachedIndexHtml) return cachedIndexHtml;
     try {
       if (!fs.existsSync(indexPath)) {
         return "<html><body><div id='root'></div></body></html>";
       }
-      const stat = fs.statSync(indexPath);
-      if (!cachedIndexHtml || stat.mtimeMs !== cachedIndexMtime) {
-        cachedIndexHtml = fs.readFileSync(indexPath, "utf8");
-        cachedIndexMtime = stat.mtimeMs;
-      }
+      cachedIndexHtml = fs.readFileSync(indexPath, "utf8");
       return cachedIndexHtml;
     } catch (e) {
       return cachedIndexHtml || "<html><body><div id='root'></div></body></html>";
