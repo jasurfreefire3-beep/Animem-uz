@@ -365,14 +365,10 @@ const io = new Server(server, {
 const authenticateToken = (req: any, res: any, next: any) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ error: "Tizimga kirish huquqi yo'q. Iltimos qayta kiring." });
-  }
+  if (!token) return res.sendStatus(401);
 
   jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
-    if (err) {
-      return res.status(403).json({ error: "Sessiya yaroqsiz yoki muddati tugagan. Iltimos qayta kiring." });
-    }
+    if (err) return res.sendStatus(403);
     req.user = decoded;
     if (decoded && decoded.id) {
       dbQuery("UPDATE users SET last_seen = NOW() WHERE id = ?", [decoded.id]).catch(() => {});
@@ -3619,7 +3615,7 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
       console.warn("Disk media save warning:", diskErr);
     }
 
-    // Store raw video bytes directly in PostgreSQL for browser streaming.
+    // Store raw video directly in PostgreSQL database for streaming via /api/video/:id
     try {
       await pgPool.query(
         "INSERT INTO video (id, filename, mime_type, data, size) VALUES ($1, $2, $3, $4, $5)",
@@ -3653,10 +3649,11 @@ app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (r
     }
 
     // Stream URL
+    const m3u8Url = `/api/video/${mediaId}`;
+
     return res.status(201).json({
       success: true,
-      url: `/api/video/${mediaId}`,
-      storage: "postgres",
+      url: m3u8Url,
       media_id: mediaId
     });
   } catch (err: any) {
