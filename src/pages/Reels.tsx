@@ -384,27 +384,19 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
   return (
     <div className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center select-none">
       
-      {/* Top Floating Header for Reels Navigation */}
-      <div className="absolute top-4 left-0 right-0 z-40 px-4 md:px-8 flex items-center justify-between pointer-events-none">
+      {/* Top Left Navigation: Back to Home and Add Video Buttons */}
+      <div className="absolute top-4 left-4 md:left-8 z-40 flex items-center space-x-2.5 pointer-events-auto">
         {/* Back to Home Button */}
         <a
           href="/"
-          className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-full backdrop-blur-md border border-white/15 shadow-xl pointer-events-auto transition-all cursor-pointer active:scale-95"
+          className="flex items-center space-x-2 bg-black/60 hover:bg-black/80 text-white px-3.5 py-2 rounded-full backdrop-blur-md border border-white/20 shadow-xl transition-all cursor-pointer active:scale-95"
           title="Bosh sahifaga qaytish"
         >
           <ArrowLeft className="w-4 h-4" />
           <span className="text-xs font-bold tracking-wide">Bosh sahifa</span>
         </a>
 
-        {/* Brand Tag */}
-        <div className="flex items-center space-x-2 bg-black/60 backdrop-blur-md px-4 py-1.5 rounded-full border border-pink-500/30 pointer-events-auto shadow-xl">
-          <Sparkles className="w-4 h-4 text-pink-400 animate-pulse" />
-          <span className="text-xs md:text-sm font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">
-            REELS
-          </span>
-        </div>
-
-        {/* User / Admin Add Reel button */}
+        {/* Add Reel button (moved to left side so it never blocks mute/unmute) */}
         <button
           onClick={() => {
             if (!currentUser) {
@@ -413,7 +405,8 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
             }
             setShowAddModal(true);
           }}
-          className="flex items-center space-x-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-xl pointer-events-auto transition-all active:scale-95 border border-pink-400/30 cursor-pointer"
+          className="flex items-center space-x-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-xl transition-all active:scale-95 border border-pink-400/30 cursor-pointer backdrop-blur-md"
+          title="Video qo'shish"
         >
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Video yuklash</span>
@@ -444,8 +437,8 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
       {/* Main Snap Container */}
       <div
         ref={containerRef}
-        className="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-none flex flex-col relative"
-        style={{ scrollBehavior: 'smooth' }}
+        className="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-none no-scrollbar flex flex-col relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        style={{ scrollBehavior: 'smooth', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {reels.map((reel, index) => {
           const isActive = index === activeIndex;

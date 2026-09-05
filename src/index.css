@@ -54,6 +54,22 @@ body {
   scrollbar-color: rgba(255, 255, 255, 0.18) #09090b;
 }
 
+/* Hide scrollbar completely utility */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar,
+[data-no-scrollbar]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar,
+.scrollbar-none,
+[data-no-scrollbar] {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
 /* Allow text selection only in input fields & textareas */
 input, textarea, [contenteditable="true"] {
   -webkit-user-select: text !important;
