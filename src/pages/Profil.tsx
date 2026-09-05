@@ -83,6 +83,7 @@ export default function Profil() {
   const [reelTitle, setReelTitle] = useState('');
   const [reelAnimeTitle, setReelAnimeTitle] = useState('');
   const [reelVideoUrl, setReelVideoUrl] = useState('');
+  const [selectedReelFileName, setSelectedReelFileName] = useState('');
   const [reelThumbnailUrl, setReelThumbnailUrl] = useState('');
   const [reelTags, setReelTags] = useState('');
   const [uploadingReel, setUploadingReel] = useState(false);
@@ -243,7 +244,7 @@ export default function Profil() {
     if (!file) return;
 
     if (!token) {
-      setReelUploadError("Avval tizimga kiring!");
+      setReelUploadError("Video yuklash uchun avval tizimga kiring!");
       return;
     }
 
@@ -268,11 +269,22 @@ export default function Profil() {
         },
         body: formData
       });
-      const data = await res.json();
-      if (data?.url) {
-        setReelVideoUrl(data.url);
+
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
       } else {
-        setReelUploadError(data.error || "Video yuklashda xatolik yuz berdi");
+        const text = await res.text();
+        throw new Error(res.status === 413 ? "Video hajmi juda katta!" : (text.slice(0, 80) || "Serverda xatolik yuz berdi"));
+      }
+
+      if (res.ok && data?.url) {
+        setReelVideoUrl(data.url);
+        const sizeFormatted = (file.size / (1024 * 1024)).toFixed(1);
+        setSelectedReelFileName(`${file.name} (${sizeFormatted} MB)`);
+      } else {
+        setReelUploadError(data?.error || "Video yuklashda xatolik yuz berdi");
       }
     } catch (err: any) {
       setReelUploadError(err?.message || "Video yuklashda xatolik yuz berdi");
@@ -284,7 +296,7 @@ export default function Profil() {
   const handleCreateUserReel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reelVideoUrl.trim()) {
-      setReelUploadError("Video faylini tanlang yoki URL kiriting!");
+      setReelUploadError("Iltimos, avval video faylini tanlang!");
       return;
     }
 
@@ -311,13 +323,22 @@ export default function Profil() {
           tags: reelTags
         })
       });
-      const data = await res.json();
+
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        throw new Error("Serverda kutilmagan xatolik yuz berdi");
+      }
+
       if (data?.success && data?.reel) {
         setUserReels(prev => [data.reel, ...prev]);
         setShowAddReelModal(false);
         setReelTitle('');
         setReelAnimeTitle('');
         setReelVideoUrl('');
+        setSelectedReelFileName('');
         setReelThumbnailUrl('');
         setReelTags('');
       } else {
@@ -1302,7 +1323,7 @@ export default function Profil() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs font-semibold text-white/70">
-                      Video fayli (Qurilmadan to'g'ridan-to'g'ri MySQL ga yuklanadi) *
+                      Video fayli *
                     </label>
                     <span className="text-[10px] text-pink-400 font-medium">
                       {currentUser?.role === 'admin' ? "Admin: Cheksiz hajm" : "Maksimal: 15 MB"}
@@ -1311,12 +1332,12 @@ export default function Profil() {
                   <label className="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-pink-500/40 hover:border-pink-500 bg-pink-500/5 cursor-pointer transition-colors text-pink-300 text-xs text-center space-y-1">
                     <Upload className="w-5 h-5 mx-auto text-pink-400" />
                     <span className="font-semibold">
-                      {uploadingReel ? "MySQL bazasiga yuklanmoqda..." : "Videoni tanlash (MP4/WebM)"}
+                      {uploadingReel ? "Video yuklanmoqda..." : "Videoni tanlash (MP4/WebM)"}
                     </span>
                     <span className="text-[10px] text-white/40">
                       {currentUser?.role === 'admin' 
                         ? "Adminlar uchun cheklovsiz video hajmi" 
-                        : "Oddiy foydalanuvchilar uchun 15 MB gacha"}
+                        : "15 MB gacha bo'lgan video fayllar"}
                     </span>
                     <input
                       type="file"
@@ -1328,26 +1349,13 @@ export default function Profil() {
                   </label>
 
                   {reelVideoUrl && (
-                    <div className="mt-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs truncate flex items-center gap-1.5">
-                      <Check size={14} /> Video tayyor: {reelVideoUrl}
+                    <div className="mt-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 select-none">
+                      <Check size={16} className="shrink-0 text-emerald-400" />
+                      <span className="truncate font-medium">
+                        ✓ Video muvaffaqiyatli tanlandi va yuklandi {selectedReelFileName ? `(${selectedReelFileName})` : ''}
+                      </span>
                     </div>
                   )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-white/70 mb-1">
-                    Yoki Video URL (m3u8 yoki mp4 havola)
-                  </label>
-                  <div className="flex items-center space-x-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
-                    <LinkIcon className="w-4 h-4 text-white/40 shrink-0" />
-                    <input
-                      type="text"
-                      placeholder="https://... yoki /api/reels/stream/..."
-                      value={reelVideoUrl}
-                      onChange={(e) => setReelVideoUrl(e.target.value)}
-                      className="w-full bg-transparent text-xs text-white focus:outline-none"
-                    />
-                  </div>
                 </div>
 
                 <div>
@@ -1422,14 +1430,20 @@ export default function Profil() {
               </div>
 
               {/* Video Player */}
-              <div className="aspect-[9/16] w-full bg-black flex items-center justify-center relative">
+              <div 
+                className="aspect-[9/16] w-full bg-black flex items-center justify-center relative select-none"
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              >
                 <video
                   src={activePreviewReel.video_url.endsWith('.m3u8') 
                     ? activePreviewReel.video_url.replace('.m3u8', '/video.mp4') 
                     : activePreviewReel.video_url}
                   controls
+                  controlsList="nodownload noplaybackrate nofullscreen"
+                  disablePictureInPicture
                   autoPlay
                   playsInline
+                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   className="w-full h-full object-contain"
                 />
               </div>

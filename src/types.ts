@@ -233,6 +233,7 @@ export interface ReelComment {
 
 export interface Reel {
   id: number | string;
+  user_id?: number | string;
   title: string;
   video_url: string;
   thumbnail_url?: string;

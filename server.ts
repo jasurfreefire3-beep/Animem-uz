@@ -3363,54 +3363,97 @@ app.delete("/api/reels/:id", authenticateToken, async (req: any, res: any) => {
   }
 });
 
-// 10. Upload Reel Video directly to MySQL media_files (Admin unlimited, regular users max 15MB)
+// 10. Upload Reel Video directly (Admin unlimited, regular users max 15MB)
 app.post("/api/reels/upload", authenticateToken, upload.single("file"), async (req: any, res: any) => {
+  const tempFilePath = req.file?.path;
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Video fayl tanlanmagan" });
     }
 
-    const fileSize = req.file.size;
+    const fileSize = req.file.size || 0;
     const isAdmin = req.user?.role === "admin";
     const maxUserSize = 15 * 1024 * 1024; // 15 MB
 
     if (!isAdmin && fileSize > maxUserSize) {
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        try { fs.unlinkSync(tempFilePath); } catch (e) {}
+      }
       const currentMB = (fileSize / (1024 * 1024)).toFixed(1);
       return res.status(400).json({ 
-        error: `Oddiy foydalanuvchilar uchun maksimal video hajmi 15 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 15 MB dan kichik video yuklang yoki admin bilan bog'laning!` 
+        error: `Oddiy foydalanuvchilar uchun maksimal video hajmi 15 MB. Siz tanlagan video hajmi: ${currentMB} MB. Iltimos 15 MB dan kichik video yuklang!` 
       });
     }
 
-    const fileBuffer = req.file.buffer;
+    let fileBuffer: Buffer | null = req.file.buffer || null;
+    if (!fileBuffer && tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fileBuffer = fs.readFileSync(tempFilePath);
+      } catch (readErr: any) {
+        console.error("Temp file read error:", readErr);
+      }
+    }
+
+    if (!fileBuffer || fileBuffer.length === 0) {
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        try { fs.unlinkSync(tempFilePath); } catch (e) {}
+      }
+      return res.status(400).json({ error: "Video faylni o'qishda xatolik yuz berdi" });
+    }
+
     const filename = req.file.originalname || "reel.mp4";
     const mimeType = req.file.mimetype || "video/mp4";
-    const base64String = fileBuffer.toString("base64");
     const mediaId = "reel_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
 
+    // Save to persistent server media storage
+    const mediaDir = path.join(process.cwd(), "data", "media");
+    if (!fs.existsSync(mediaDir)) {
+      fs.mkdirSync(mediaDir, { recursive: true });
+    }
+    const localDiskPath = path.join(mediaDir, `${mediaId}.mp4`);
     try {
+      fs.writeFileSync(localDiskPath, fileBuffer);
+    } catch (diskErr) {
+      console.warn("Disk media save warning:", diskErr);
+    }
+
+    // Sync to database if available
+    try {
+      const base64String = fileBuffer.toString("base64");
       await dbQuery(
         `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?)`,
         [mediaId, filename, mimeType, base64String, fileSize]
       );
     } catch (e: any) {
-      console.warn("media_files reel insert warning:", e?.message || e);
+      console.warn("media_files DB sync notice (disk/cache served):", e?.message || e);
     }
 
-    // Cache in RAM for instant first playback
-    mediaMemoryCache.set(mediaId, { mimeType, base64: base64String, buffer: fileBuffer });
-    
-    // M3U8 HLS streaming playlist URL
+    // Cache in RAM for rapid response
+    mediaMemoryCache.set(mediaId, { mimeType, base64: "", buffer: fileBuffer });
+    if (mediaMemoryCache.size > 200) {
+      const first = mediaMemoryCache.keys().next().value;
+      if (first) mediaMemoryCache.delete(first);
+    }
+
+    // Delete temp file after successful storage
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try { fs.unlinkSync(tempFilePath); } catch (e) {}
+    }
+
+    // Stream URL
     const m3u8Url = `/api/reels/stream/${mediaId}.m3u8`;
 
     return res.status(201).json({
       success: true,
       url: m3u8Url,
-      direct_url: `/api/media/${mediaId}`,
       media_id: mediaId
     });
   } catch (err: any) {
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try { fs.unlinkSync(tempFilePath); } catch (e) {}
+    }
     console.error("Upload reel video error:", err);
-    return res.status(500).json({ error: "Video faylni yuklashda xatolik yuz berdi" });
+    return res.status(500).json({ error: "Video yuklashda server xatoligi yuz berdi" });
   }
 });
 
@@ -3434,12 +3477,45 @@ app.get("/api/reels/stream/:id.m3u8", async (req: any, res: any) => {
   return res.send(m3u8Content);
 });
 
-// 12. HLS Video segment & stream from MySQL with HTTP 206 Partial Content (Range) support
+// 12. HLS Video segment & stream with HTTP 206 Partial Content (Range) support
 app.get(["/api/reels/stream/:id/video.mp4", "/api/reels/stream/:id/segment.ts"], async (req: any, res: any) => {
   try {
     const mediaId = req.params.id;
     if (!mediaId) return res.status(400).send("Media ID topilmadi");
 
+    // 1. Check local persistent disk storage first (fastest, zero RAM footprint)
+    const localDiskPath = path.join(process.cwd(), "data", "media", `${mediaId}.mp4`);
+    if (fs.existsSync(localDiskPath)) {
+      const stat = fs.statSync(localDiskPath);
+      const totalSize = stat.size;
+      const range = req.headers.range;
+
+      res.setHeader("Accept-Ranges", "bytes");
+      res.setHeader("Content-Type", "video/mp4");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Content-Disposition", "inline");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+        const chunksize = end - start + 1;
+
+        res.status(206);
+        res.setHeader("Content-Range", `bytes ${start}-${end}/${totalSize}`);
+        res.setHeader("Content-Length", chunksize);
+        const fileStream = fs.createReadStream(localDiskPath, { start, end });
+        return fileStream.pipe(res);
+      } else {
+        res.setHeader("Content-Length", totalSize);
+        const fileStream = fs.createReadStream(localDiskPath);
+        return fileStream.pipe(res);
+      }
+    }
+
+    // 2. Check memory cache or database
     let mimeType = "video/mp4";
     let buffer: Buffer | null = null;
 
@@ -3450,7 +3526,7 @@ app.get(["/api/reels/stream/:id/video.mp4", "/api/reels/stream/:id/segment.ts"],
     } else {
       const [rows]: any = await dbQuery("SELECT mime_type, data FROM media_files WHERE id = ?", [mediaId]);
       if (!rows || rows.length === 0) {
-        return res.status(404).send("Video MySQL bazasida topilmadi");
+        return res.status(404).send("Video topilmadi");
       }
       mimeType = rows[0].mime_type || "video/mp4";
       buffer = Buffer.from(rows[0].data, "base64");
@@ -3461,7 +3537,7 @@ app.get(["/api/reels/stream/:id/video.mp4", "/api/reels/stream/:id/segment.ts"],
       }
     }
 
-    if (!buffer) return res.status(404).send("Video fayl mavjud emas");
+    if (!buffer) return res.status(404).send("Video topilmadi");
 
     const totalSize = buffer.length;
     const range = req.headers.range;
@@ -3469,6 +3545,9 @@ app.get(["/api/reels/stream/:id/video.mp4", "/api/reels/stream/:id/segment.ts"],
     res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Content-Type", mimeType);
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Disposition", "inline");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
 
     if (range) {
       const parts = range.replace(/bytes=/, "").split("-");

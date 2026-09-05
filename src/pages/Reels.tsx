@@ -13,7 +13,8 @@ import {
   X,
   Upload,
   Link as LinkIcon,
-  Trash2
+  Trash2,
+  Check
 } from 'lucide-react';
 import ReelsPlayer from '../components/ReelsPlayer';
 import ReelsCommentsModal from '../components/ReelsCommentsModal';
@@ -42,6 +43,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
   const [newTitle, setNewTitle] = useState<string>('');
   const [newAnimeTitle, setNewAnimeTitle] = useState<string>('');
   const [newVideoUrl, setNewVideoUrl] = useState<string>('');
+  const [selectedFileName, setSelectedFileName] = useState<string>('');
   const [newThumbnailUrl, setNewThumbnailUrl] = useState<string>('');
   const [newTags, setNewTags] = useState<string>('#anime #reels #animemuz');
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -252,11 +254,22 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
         },
         body: formData,
       });
-      const data = await res.json();
-      if (data?.url) {
-        setNewVideoUrl(data.url);
+
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
       } else {
-        setAddError(data.error || "Video yuklashda xatolik");
+        const text = await res.text();
+        throw new Error(res.status === 413 ? "Video hajmi juda katta!" : (text.slice(0, 80) || "Serverda xatolik yuz berdi"));
+      }
+
+      if (res.ok && data?.url) {
+        setNewVideoUrl(data.url);
+        const sizeFormatted = (file.size / (1024 * 1024)).toFixed(1);
+        setSelectedFileName(`${file.name} (${sizeFormatted} MB)`);
+      } else {
+        setAddError(data?.error || "Video yuklashda xatolik");
       }
     } catch (err: any) {
       setAddError(err?.message || "Video yuklashda xatolik");
@@ -268,7 +281,7 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
   const handleCreateReel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVideoUrl.trim()) {
-      setAddError("Video manzili yoki fayli kiritilishi shart!");
+      setAddError("Iltimos, avval video faylini tanlang!");
       return;
     }
 
@@ -292,13 +305,21 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
         }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        throw new Error("Serverda kutilmagan xatolik yuz berdi");
+      }
+
       if (data?.success && data?.reel) {
         setReels((prev) => [data.reel, ...prev]);
         setShowAddModal(false);
         setNewTitle('');
         setNewAnimeTitle('');
         setNewVideoUrl('');
+        setSelectedFileName('');
         setNewThumbnailUrl('');
         setActiveIndex(0);
       } else {
@@ -615,20 +636,20 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                 />
               </div>
 
-              {/* Video upload from device or URL */}
+              {/* Video upload from device */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-white/70">
-                    Video fayli (Qurilmadan to'g'ridan-to'g'ri MySQL ga)
+                    Video fayli *
                   </label>
                   <span className="text-[10px] text-pink-400 font-medium">
                     {currentUser?.role === 'admin' ? "Admin: Hajm cheklovsiz" : "Maksimal: 15 MB"}
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <label className="flex-1 flex items-center justify-center space-x-2 px-3.5 py-2.5 rounded-xl border border-dashed border-pink-500/50 hover:border-pink-500 bg-pink-500/10 cursor-pointer transition-colors text-pink-300 text-xs font-medium">
+                  <label className="flex-1 flex items-center justify-center space-x-2 px-3.5 py-3 rounded-xl border border-dashed border-pink-500/50 hover:border-pink-500 bg-pink-500/10 cursor-pointer transition-colors text-pink-300 text-xs font-medium">
                     <Upload className="w-4 h-4" />
-                    <span>{isUploading ? "MySQL ga yuklanmoqda..." : "Videoni tanlang (MP4/WebM)"}</span>
+                    <span>{isUploading ? "Video yuklanmoqda..." : "Videoni tanlang (MP4/WebM)"}</span>
                     <input
                       type="file"
                       accept="video/mp4,video/webm"
@@ -639,27 +660,13 @@ export default function Reels({ currentUser: propUser }: ReelsProps) {
                   </label>
                 </div>
                 {newVideoUrl && (
-                  <p className="text-[11px] text-emerald-400 mt-1 truncate">
-                    ✓ Video saqlandi: {newVideoUrl}
-                  </p>
+                  <div className="mt-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-1.5 select-none">
+                    <Check size={14} className="shrink-0" />
+                    <span className="truncate">
+                      ✓ Video muvaffaqiyatli tanlandi va yuklandi {selectedFileName ? `(${selectedFileName})` : ''}
+                    </span>
+                  </div>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-white/70 mb-1">
-                  Yoki Video URL (Playerjs orqali o'ynatiladi)
-                </label>
-                <div className="flex items-center space-x-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
-                  <LinkIcon className="w-4 h-4 text-white/40 shrink-0" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="https://... yoki /api/media/..."
-                    value={newVideoUrl}
-                    onChange={(e) => setNewVideoUrl(e.target.value)}
-                    className="w-full bg-transparent text-sm text-white focus:outline-none"
-                  />
-                </div>
               </div>
 
               <div>

@@ -76,6 +76,8 @@ export default function ReelsPlayer({
             loop: 1,
             volume: isMuted ? 0 : 80,
             theme: '#ff006a',
+            download: 0,
+            filedownload: 0,
           });
 
           // Wait a tick then handle play state
@@ -203,12 +205,14 @@ export default function ReelsPlayer({
     <div 
       className="relative w-full h-full bg-black overflow-hidden select-none flex items-center justify-center"
       onClick={handleTapOrClick}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
     >
       {/* PlayerJS Container */}
       {!useFallback ? (
         <div
           id={containerId}
-          className="w-full h-full flex items-center justify-center [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          className="w-full h-full flex items-center justify-center [&_video]:object-cover [&_video]:w-full [&_video]:h-full select-none"
           style={{ width: '100%', height: '100%' }}
         />
       ) : (
@@ -219,9 +223,18 @@ export default function ReelsPlayer({
           playsInline
           loop
           muted={isMuted}
-          className="w-full h-full object-cover"
+          controlsList="nodownload noplaybackrate nofullscreen"
+          disablePictureInPicture
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          className="w-full h-full object-cover pointer-events-none select-none"
         />
       )}
+
+      {/* Invisible protective click overlay */}
+      <div 
+        className="absolute inset-0 z-10 select-none" 
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      />
 
       {/* Floating Mute/Unmute Button in top right */}
       <button
