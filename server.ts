@@ -2518,7 +2518,6 @@ const memoryUpload = multer({
 // High performance in-memory media cache to minimize DB load on frequent hits
 const mediaMemoryCache = new Map<string, { mimeType: string; base64: string; buffer: Buffer }>();
 
-// Upload single image from device directly into MySQL Database (NO DISK STORAGE)
 app.post("/api/media/upload", authenticateToken, memoryUpload.single("file"), async (req: any, res: any) => {
   try {
     let fileBuffer: Buffer | null = null;
@@ -2548,91 +2547,83 @@ app.post("/api/media/upload", authenticateToken, memoryUpload.single("file"), as
       return res.status(400).json({ error: "Rasm fayli tanlanmadi yoki bo'sh" });
     }
 
-    const base64String = fileBuffer.toString("base64");
-    const mediaId = "img_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
-
-    // Save directly into MySQL database (media_files table) - no disk involved
     try {
-      // Store raw bytes to postgresql
-      await pgPool.query(
-        "INSERT INTO video (id, filename, mime_type, data, size) VALUES ($1, $2, $3, $4, $5)",
-        [mediaId, filename, mimeType, fileBuffer, fileSize]
-      );
-      console.log(`[MySQL DB] Stored media image #${mediaId} (${filename}, ${fileSize} bytes) into database`);
-    } catch (dbErr) {
-      console.error("[MySQL DB] Failed to insert media into database:", dbErr);
-    }
+      const formData = new FormData();
+      formData.append("reqtype", "fileupload");
+      formData.append("fileToUpload", new Blob([fileBuffer], { type: mimeType }), filename);
 
-    // Keep in RAM cache for fast serving
-    mediaMemoryCache.set(mediaId, { mimeType, base64: base64String, buffer: fileBuffer });
-    if (mediaMemoryCache.size > 300) {
-      const firstKey = mediaMemoryCache.keys().next().value;
-      if (firstKey) mediaMemoryCache.delete(firstKey);
-    }
+      const catboxRes = await fetch("https://catbox.moe/user/api.php", {
+        method: "POST",
+        body: formData
+      });
 
-    const mediaUrl = `/api/media/${mediaId}`;
-    return res.status(201).json({
-      success: true,
-      id: mediaId,
-      url: mediaUrl,
-      filename,
-      size: fileSize,
-      mime_type: mimeType
-    });
+      if (catboxRes.ok) {
+        const resultText = await catboxRes.text();
+        if (resultText && resultText.trim().startsWith("http")) {
+          const mediaUrl = resultText.trim();
+          return res.status(201).json({
+            success: true,
+            id: mediaUrl,
+            url: mediaUrl,
+            filename,
+            size: fileSize,
+            mime_type: mimeType
+          });
+        }
+      }
+      throw new Error("Catbox xatoligi");
+    } catch (catErr) {
+      console.error("[Catbox] Failed to insert media:", catErr);
+      return res.status(500).json({ error: "Rasmni yuklashda xatolik yuz berdi" });
+    }
   } catch (err: any) {
-    console.error("Media upload to MySQL error:", err);
-    return res.status(500).json({ error: "Rasmni MySQL bazasiga yuklashda xatolik yuz berdi" });
+    console.error("Media upload error:", err);
+    return res.status(500).json({ error: "Rasmni yuklashda xatolik yuz berdi" });
   }
-});
-
-// Upload multiple images from device directly into MySQL Database (e.g. Manga Chapter Pages)
+// Upload multiple images from device directly into Catbox
 app.post("/api/media/upload-multiple", authenticateToken, memoryUpload.array("files", 60), async (req: any, res: any) => {
   try {
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) {
       return res.status(400).json({ error: "Hech qanday rasm fayllari tanlanmadi" });
     }
-
     const results = [];
     for (const file of files) {
       const fileBuffer = file.buffer;
       const mimeType = file.mimetype || "image/jpeg";
       const filename = file.originalname || "image.jpg";
       const fileSize = file.size || fileBuffer.length;
-      const base64String = fileBuffer.toString("base64");
-      const mediaId = "img_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
-
       try {
-        await dbQuery(
-          `INSERT INTO media_files (id, filename, mime_type, data, size) VALUES (?, ?, ?, ?, ?)`,
-          [mediaId, filename, mimeType, base64String, fileSize]
-        );
-      } catch (dbErr) {
-        console.error("[MySQL DB] Failed to save multiple media item to database:", dbErr);
+        const formData = new FormData();
+        formData.append("reqtype", "fileupload");
+        formData.append("fileToUpload", new Blob([fileBuffer], { type: mimeType }), filename);
+        const catboxRes = await fetch("https://catbox.moe/user/api.php", { method: "POST", body: formData });
+        if (catboxRes.ok) {
+          const resultText = await catboxRes.text();
+          if (resultText && resultText.trim().startsWith("http")) {
+            const mediaUrl = resultText.trim();
+            results.push({
+              id: mediaUrl,
+              url: mediaUrl,
+              filename,
+              size: fileSize
+            });
+          }
+        }
+      } catch (catErr) {
+        console.error("[Catbox] Failed to save multiple media item:", catErr);
       }
-
-      mediaMemoryCache.set(mediaId, { mimeType, base64: base64String, buffer: fileBuffer });
-      results.push({
-        id: mediaId,
-        url: `/api/media/${mediaId}`,
-        filename,
-        size: fileSize
-      });
     }
-
     return res.status(201).json({
       success: true,
       count: results.length,
       files: results
     });
   } catch (err: any) {
-    console.error("Multiple media upload to MySQL error:", err);
-    return res.status(500).json({ error: "Rasmlarni MySQL bazasiga yuklashda xatolik" });
+    console.error("Multiple media upload error:", err);
+    return res.status(500).json({ error: "Rasmlarni yuklashda xatolik yuz berdi" });
   }
 });
-
-// Serve image directly from MySQL Database
-app.get("/api/media/:id", async (req: any, res: any) => {
   try {
     const id = req.params.id;
     if (!id) return res.status(400).send("Media ID kiritilishi shart");
